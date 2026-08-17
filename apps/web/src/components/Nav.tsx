@@ -1,11 +1,14 @@
 import { Link, useRouter } from '@tanstack/react-router'
+import { useState } from 'react'
 import type { CurrentUser } from '../lib/auth'
 import { logout } from '../lib/auth'
 
 export default function Nav({ user }: { user: CurrentUser | null }) {
   const router = useRouter()
+  const [open, setOpen] = useState(false)
 
   async function handleLogout() {
+    setOpen(false)
     await logout()
     await router.navigate({ to: '/login' })
     router.invalidate()
@@ -13,17 +16,36 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
 
   return (
     <nav className="app-nav">
-      <div className="container">
-        <Link to={user ? '/expenses' : '/login'} className="brand">
+      <div className="container nav-row">
+        <Link to={user ? '/expenses' : '/login'} className="brand" onClick={() => setOpen(false)}>
           Flovea
         </Link>
-        <div className="links">
+        {user && (
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-label="Buka menu"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        )}
+        <div className={`links ${open ? 'links-open' : ''}`}>
           {user ? (
             <>
-              <Link to="/expenses">Riwayat</Link>
-              <Link to="/expenses/new">Tambah</Link>
-              <Link to="/import">Import</Link>
-              <span className="muted">{user.display_name}</span>
+              <Link to="/expenses" onClick={() => setOpen(false)}>
+                Riwayat
+              </Link>
+              <Link to="/expenses/new" onClick={() => setOpen(false)}>
+                Tambah
+              </Link>
+              <Link to="/import" onClick={() => setOpen(false)}>
+                Import
+              </Link>
+              <span className="muted nav-user">{user.display_name}</span>
               <button type="button" className="secondary" onClick={handleLogout}>
                 Logout
               </button>

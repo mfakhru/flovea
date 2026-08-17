@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
 import { requireUser } from '../../lib/auth'
 import { createCategory, createExpense, listCategories } from '../../lib/expenses'
@@ -16,9 +16,14 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function formatThousands(digits: string) {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
 function NewExpensePage() {
   const { categories: initialCategories } = Route.useLoaderData()
   const navigate = useNavigate()
+  const router = useRouter()
   const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [expenseDate, setExpenseDate] = useState(todayIso())
   const [categoryId, setCategoryId] = useState<number | ''>(categories[0]?.id ?? '')
@@ -26,8 +31,14 @@ function NewExpensePage() {
   const [detail, setDetail] = useState('')
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
+  const [needsReimburse, setNeedsReimburse] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/[^0-9]/g, '')
+    setAmount(formatThousands(digits))
+  }
 
   async function handleAddCategory() {
     const name = newCategory.trim()
@@ -49,7 +60,7 @@ function NewExpensePage() {
       setError('Pilih kategori dulu')
       return
     }
-    const amountNumber = Number(amount.replace(/[^0-9]/g, ''))
+    const amountNumber = Number(amount.replace(/\./g, ''))
     if (!amountNumber) {
       setError('Nominal tidak valid')
       return
@@ -63,8 +74,10 @@ function NewExpensePage() {
           detail,
           amount: amountNumber,
           notes: notes || null,
+          needs_reimburse: needsReimburse,
         },
       })
+      await router.invalidate()
       navigate({ to: '/expenses' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal menyimpan')
@@ -123,7 +136,7 @@ function NewExpensePage() {
             id="amount"
             inputMode="numeric"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={handleAmountChange}
             required
           />
         </div>
@@ -131,6 +144,14 @@ function NewExpensePage() {
           <label htmlFor="notes">Keterangan (opsional)</label>
           <textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </div>
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={needsReimburse}
+            onChange={(e) => setNeedsReimburse(e.target.checked)}
+          />
+          Perlu direimburse pasangan
+        </label>
         <button type="submit" disabled={submitting}>
           {submitting ? 'Menyimpan...' : 'Simpan'}
         </button>

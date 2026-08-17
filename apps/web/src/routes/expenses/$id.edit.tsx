@@ -1,7 +1,7 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
 import { requireUser } from '../../lib/auth'
-import { deleteExpense, getExpense, listCategories, updateExpense } from '../../lib/expenses'
+import { deleteExpense, getExpense, listCategories, toggleReimburse, updateExpense } from '../../lib/expenses'
 
 export const Route = createFileRoute('/expenses/$id/edit')({
   beforeLoad: async () => {
@@ -18,21 +18,34 @@ export const Route = createFileRoute('/expenses/$id/edit')({
   component: EditExpensePage,
 })
 
+function formatThousands(digits: string) {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
 function EditExpensePage() {
-  const { expense, categories } = Route.useLoaderData()
+  const { expense: initialExpense, categories } = Route.useLoaderData()
   const navigate = useNavigate()
+  const router = useRouter()
+  const [expense, setExpense] = useState(initialExpense)
   const [expenseDate, setExpenseDate] = useState(expense.expense_date)
   const [categoryId, setCategoryId] = useState(expense.category_id)
   const [detail, setDetail] = useState(expense.detail)
-  const [amount, setAmount] = useState(String(expense.amount))
+  const [amount, setAmount] = useState(formatThousands(String(expense.amount)))
   const [notes, setNotes] = useState(expense.notes ?? '')
+  const [needsReimburse, setNeedsReimburse] = useState(expense.needs_reimburse)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [togglingReimburse, setTogglingReimburse] = useState(false)
+
+  function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/[^0-9]/g, '')
+    setAmount(formatThousands(digits))
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    const amountNumber = Number(amount.replace(/[^0-9]/g, ''))
+    const amountNumber = Number(amount.replace(/\./g, ''))
     if (!amountNumber) {
       setError('Nominal tidak valid')
       return
@@ -47,8 +60,10 @@ function EditExpensePage() {
           detail,
           amount: amountNumber,
           notes: notes || null,
+          needs_reimburse: needsReimburse,
         },
       })
+      await router.invalidate()
       navigate({ to: '/expenses' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal menyimpan')
@@ -57,11 +72,26 @@ function EditExpensePage() {
     }
   }
 
+  async function handleToggleReimburse() {
+    setTogglingReimburse(true)
+    setError(null)
+    try {
+      const updated = await toggleReimburse({ data: { id: expense.id } })
+      setExpense(updated)
+      await router.invalidate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal update status reimburse')
+    } finally {
+      setTogglingReimburse(false)
+    }
+  }
+
   async function handleDelete() {
     if (!confirm('Hapus pengeluaran ini?')) return
     setSubmitting(true)
     try {
       await deleteExpense({ data: { id: expense.id } })
+      await router.invalidate()
       navigate({ to: '/expenses' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal menghapus')
@@ -109,7 +139,7 @@ function EditExpensePage() {
             id="amount"
             inputMode="numeric"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={handleAmountChange}
             required
           />
         </div>
@@ -117,6 +147,31 @@ function EditExpensePage() {
           <label htmlFor="notes">Keterangan (opsional)</label>
           <textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </div>
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={needsReimburse}
+            onChange={(e) => setNeedsReimburse(e.target.checked)}
+          />
+          Perlu direimburse pasangan
+        </label>
+
+        {expense.needs_reimburse && (
+          <div className="reimburse-box">
+            <span className={expense.reimbursed_at ? 'badge badge-paid' : 'badge badge-pending'}>
+              {expense.reimbursed_at ? `Sudah dibayar (${expense.reimbursed_at})` : 'Belum dibayar'}
+            </span>
+            <button
+              type="button"
+              className="secondary"
+              onClick={handleToggleReimburse}
+              disabled={togglingReimburse}
+            >
+              {expense.reimbursed_at ? 'Batalkan tanda lunas' : 'Tandai sudah dibayar'}
+            </button>
+          </div>
+        )}
+
         <div className="row">
           <button type="submit" disabled={submitting}>
             {submitting ? 'Menyimpan...' : 'Simpan'}

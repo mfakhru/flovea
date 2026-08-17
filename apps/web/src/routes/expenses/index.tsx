@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import { requireUser } from '../../lib/auth'
 import { listCategories, listExpenses, listUsers } from '../../lib/expenses'
 import type { Category, Expense, UserSummary } from '../../lib/expenses'
@@ -8,6 +9,8 @@ type ExpensesSearch = {
   month?: number
   user_id?: number
   category_id?: number
+  q?: string
+  sort?: 'asc' | 'desc'
   page?: number
 }
 
@@ -31,6 +34,8 @@ export const Route = createFileRoute('/expenses/')({
     month: search.month ? Number(search.month) : undefined,
     user_id: search.user_id ? Number(search.user_id) : undefined,
     category_id: search.category_id ? Number(search.category_id) : undefined,
+    q: search.q ? String(search.q) : undefined,
+    sort: search.sort === 'asc' ? 'asc' : 'desc',
     page: search.page ? Number(search.page) : 1,
   }),
   beforeLoad: async () => {
@@ -52,9 +57,25 @@ function ExpensesPage() {
   const search = Route.useSearch()
   const { expenses, categories, users } = Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
+  const [searchInput, setSearchInput] = useState(search.q ?? '')
+
+  // debounce the search box so typing doesn't fire a server function per keystroke
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      if (searchInput !== (search.q ?? '')) {
+        navigate({ search: (prev) => ({ ...prev, q: searchInput || undefined, page: 1 }) })
+      }
+    }, 400)
+    return () => clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput])
 
   function updateFilter(patch: Partial<ExpensesSearch>) {
     navigate({ search: (prev) => ({ ...prev, ...patch, page: 1 }) })
+  }
+
+  function toggleSort() {
+    navigate({ search: (prev) => ({ ...prev, sort: prev.sort === 'asc' ? 'desc' : 'asc' }) })
   }
 
   const categoryById = new Map(categories.map((c: Category) => [c.id, c.name]))
@@ -65,6 +86,15 @@ function ExpensesPage() {
       <h1>Riwayat Pengeluaran</h1>
 
       <div className="filters card">
+        <div className="field">
+          <label htmlFor="f-search">Cari</label>
+          <input
+            id="f-search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="untuk / keterangan..."
+          />
+        </div>
         <div className="field">
           <label htmlFor="f-year">Tahun</label>
           <input
@@ -136,33 +166,45 @@ function ExpensesPage() {
       {expenses.length === 0 ? (
         <p className="muted">Belum ada data untuk filter ini.</p>
       ) : (
-        <div className="card">
-          <table>
+        <div className="card table-card">
+          <table className="expenses-table">
             <thead>
               <tr>
-                <th>Tanggal</th>
+                <th className="sortable" onClick={toggleSort}>
+                  Tanggal {search.sort === 'asc' ? '↑' : '↓'}
+                </th>
                 <th>Kategori</th>
                 <th>Untuk</th>
-                <th>Orang</th>
                 <th className="amount">Nominal</th>
                 <th>Keterangan</th>
-                <th />
+                <th>Reimburse</th>
+                <th>Orang</th>
               </tr>
             </thead>
             <tbody>
               {expenses.map((e: Expense) => (
-                <tr key={e.id}>
-                  <td>{e.expense_date}</td>
-                  <td>{categoryById.get(e.category_id) ?? '-'}</td>
-                  <td>{e.detail}</td>
-                  <td>{userById.get(e.user_id) ?? '-'}</td>
-                  <td className="amount">{formatRupiah(e.amount)}</td>
-                  <td>{e.notes ?? ''}</td>
-                  <td className="actions-cell">
-                    <Link to="/expenses/$id/edit" params={{ id: String(e.id) }}>
-                      Edit
-                    </Link>
+                <tr
+                  key={e.id}
+                  className="row-link"
+                  onClick={() => navigate({ to: '/expenses/$id/edit', params: { id: String(e.id) } })}
+                >
+                  <td data-label="Tanggal">{e.expense_date}</td>
+                  <td data-label="Kategori">{categoryById.get(e.category_id) ?? '-'}</td>
+                  <td data-label="Untuk">{e.detail}</td>
+                  <td data-label="Nominal" className="amount">
+                    {formatRupiah(e.amount)}
                   </td>
+                  <td data-label="Keterangan">{e.notes ?? ''}</td>
+                  <td data-label="Reimburse">
+                    {e.needs_reimburse ? (
+                      <span className={e.reimbursed_at ? 'badge badge-paid' : 'badge badge-pending'}>
+                        {e.reimbursed_at ? 'Lunas' : 'Belum'}
+                      </span>
+                    ) : (
+                      <span className="muted">-</span>
+                    )}
+                  </td>
+                  <td data-label="Orang">{userById.get(e.user_id) ?? '-'}</td>
                 </tr>
               ))}
             </tbody>

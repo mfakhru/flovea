@@ -16,6 +16,8 @@ async def list_expenses(
     month: int | None = None,
     user_id: int | None = None,
     category_id: int | None = None,
+    q: str | None = None,
+    sort: str = "desc",
     page: int = 1,
     user: dict = Depends(get_current_user),
 ):
@@ -39,10 +41,18 @@ async def list_expenses(
     if category_id is not None:
         clauses.append("category_id = ?")
         params.append(category_id)
+    if q:
+        clauses.append("(detail LIKE ? OR notes LIKE ?)")
+        like = f"%{q}%"
+        params.extend([like, like])
 
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    order = "ASC" if sort == "asc" else "DESC"
     offset = max(page - 1, 0) * PAGE_SIZE
-    sql = f"SELECT * FROM expenses {where} ORDER BY expense_date DESC, id DESC LIMIT ? OFFSET ?"
+    sql = (
+        f"SELECT * FROM expenses {where} "
+        f"ORDER BY expense_date {order}, id {order} LIMIT ? OFFSET ?"
+    )
     return await fetch_all(env.DB, sql, *params, PAGE_SIZE, offset)
 
 
@@ -60,9 +70,15 @@ async def create_expense(body: ExpenseCreate, request: Request, user: dict = Dep
     env = request.scope["env"]
     meta = await execute(
         env.DB,
-        "INSERT INTO expenses (user_id, category_id, expense_date, detail, amount, notes) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        user["sub"], body.category_id, body.expense_date, body.detail, body.amount, body.notes,
+        "INSERT INTO expenses (user_id, category_id, expense_date, detail, amount, notes, needs_reimburse) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        user["sub"],
+        body.category_id,
+        body.expense_date,
+        body.detail,
+        body.amount,
+        body.notes,
+        int(body.needs_reimburse),
     )
     return await fetch_one(env.DB, "SELECT * FROM expenses WHERE id = ?", meta["last_row_id"])
 
@@ -76,10 +92,38 @@ async def update_expense(
     if not existing:
         raise HTTPException(status_code=404, detail="Expense not found")
 
+    # if reimbursement is no longer needed, any prior "paid" mark is stale — clear it
+    reimbursed_at = existing["reimbursed_at"] if body.needs_reimburse else None
     await execute(
         env.DB,
-        "UPDATE expenses SET category_id = ?, expense_date = ?, detail = ?, amount = ?, notes = ? WHERE id = ?",
-        body.category_id, body.expense_date, body.detail, body.amount, body.notes, expense_id,
+        "UPDATE expenses SET category_id = ?, expense_date = ?, detail = ?, amount = ?, notes = ?, "
+        "needs_reimburse = ?, reimbursed_at = ? WHERE id = ?",
+        body.category_id,
+        body.expense_date,
+        body.detail,
+        body.amount,
+        body.notes,
+        int(body.needs_reimburse),
+        reimbursed_at,
+        expense_id,
+    )
+    return await fetch_one(env.DB, "SELECT * FROM expenses WHERE id = ?", expense_id)
+
+
+@router.post("/expenses/{expense_id}/reimburse", response_model=ExpenseOut)
+async def toggle_reimburse(expense_id: int, request: Request, user: dict = Depends(get_current_user)):
+    env = request.scope["env"]
+    existing = await fetch_one(env.DB, "SELECT * FROM expenses WHERE id = ?", expense_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    if not existing["needs_reimburse"]:
+        raise HTTPException(status_code=400, detail="Expense is not marked for reimbursement")
+
+    await execute(
+        env.DB,
+        "UPDATE expenses SET reimbursed_at = CASE WHEN reimbursed_at IS NULL "
+        "THEN datetime('now') ELSE NULL END WHERE id = ?",
+        expense_id,
     )
     return await fetch_one(env.DB, "SELECT * FROM expenses WHERE id = ?", expense_id)
 

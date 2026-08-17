@@ -12,6 +12,8 @@ export type Expense = {
   detail: string
   amount: number
   notes: string | null
+  needs_reimburse: boolean
+  reimbursed_at: string | null
   created_at: string
 }
 
@@ -20,6 +22,8 @@ export type ExpenseFilters = {
   month?: number
   user_id?: number
   category_id?: number
+  q?: string
+  sort?: 'asc' | 'desc'
   page?: number
 }
 
@@ -29,6 +33,7 @@ export type ExpenseInput = {
   detail: string
   amount: number
   notes?: string | null
+  needs_reimburse?: boolean
 }
 
 export type ImportResult = {
@@ -63,6 +68,8 @@ export const listExpenses = createServerFn({ method: 'GET' })
     if (data.month) params.set('month', String(data.month))
     if (data.user_id) params.set('user_id', String(data.user_id))
     if (data.category_id) params.set('category_id', String(data.category_id))
+    if (data.q) params.set('q', data.q)
+    if (data.sort) params.set('sort', data.sort)
     if (data.page) params.set('page', String(data.page))
     return apiJson<Expense[]>(`/expenses?${params.toString()}`)
   })
@@ -92,6 +99,13 @@ export const updateExpense = createServerFn({ method: 'POST' })
       body: JSON.stringify(body),
     })
   })
+
+export const toggleReimburse = createServerFn({ method: 'POST' })
+  .validator((data: { id: number }) => data)
+  .handler(
+    async ({ data }): Promise<Expense> =>
+      apiJson<Expense>(`/expenses/${data.id}/reimburse`, { method: 'POST' }),
+  )
 
 export const deleteExpense = createServerFn({ method: 'POST' })
   .validator((data: { id: number }) => data)

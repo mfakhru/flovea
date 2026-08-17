@@ -33,6 +33,7 @@ class ExpenseCreate(BaseModel):
     detail: str
     amount: int  # IDR, whole rupiah, no decimals
     notes: str | None = None
+    needs_reimburse: bool = False
 
 
 class ExpenseOut(BaseModel):
@@ -43,6 +44,8 @@ class ExpenseOut(BaseModel):
     detail: str
     amount: int
     notes: str | None = None
+    needs_reimburse: bool
+    reimbursed_at: str | None = None
     created_at: str
 
 
