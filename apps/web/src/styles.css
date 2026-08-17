@@ -40,7 +40,7 @@ a {
 .container {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 1.5rem;
 }
 
 /* ---- Nav ---- */
@@ -596,10 +596,6 @@ tbody tr:last-child td {
 /* ---- Mobile ---- */
 
 @media (max-width: 640px) {
-  .container {
-    padding: 0 1.25rem;
-  }
-
   .nav-toggle {
     display: flex;
   }
