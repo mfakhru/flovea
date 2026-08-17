@@ -1,7 +1,13 @@
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
 import { requireUser } from '../../lib/auth'
-import { deleteExpense, getExpense, listCategories, toggleReimburse, updateExpense } from '../../lib/expenses'
+import {
+  deleteExpense,
+  getExpense,
+  listCategories,
+  toggleReimburse,
+  updateExpense,
+} from '../../lib/expenses'
 
 export const Route = createFileRoute('/expenses/$id/edit')({
   beforeLoad: async () => {
@@ -101,9 +107,16 @@ function EditExpensePage() {
 
   return (
     <main className="page container">
-      <h1>Edit Pengeluaran</h1>
+      <div className="page-head">
+        <div>
+          <h1>Edit Pengeluaran</h1>
+          <p className="page-subtitle">Ubah atau hapus catatan ini</p>
+        </div>
+      </div>
+
       <form className="stack card" onSubmit={handleSubmit}>
         {error && <div className="error">{error}</div>}
+
         <div className="field">
           <label htmlFor="date">Tanggal</label>
           <input
@@ -114,6 +127,7 @@ function EditExpensePage() {
             required
           />
         </div>
+
         <div className="field">
           <label htmlFor="category">Kategori</label>
           <select
@@ -129,10 +143,12 @@ function EditExpensePage() {
             ))}
           </select>
         </div>
+
         <div className="field">
           <label htmlFor="detail">Untuk</label>
           <input id="detail" value={detail} onChange={(e) => setDetail(e.target.value)} required />
         </div>
+
         <div className="field">
           <label htmlFor="amount">Nominal (Rp)</label>
           <input
@@ -143,10 +159,12 @@ function EditExpensePage() {
             required
           />
         </div>
+
         <div className="field">
           <label htmlFor="notes">Keterangan (opsional)</label>
           <textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </div>
+
         <label className="checkbox-field">
           <input
             type="checkbox"
@@ -159,15 +177,15 @@ function EditExpensePage() {
         {expense.needs_reimburse && (
           <div className="reimburse-box">
             <span className={expense.reimbursed_at ? 'badge badge-paid' : 'badge badge-pending'}>
-              {expense.reimbursed_at ? `Sudah dibayar (${expense.reimbursed_at})` : 'Belum dibayar'}
+              {expense.reimbursed_at ? `Lunas · ${expense.reimbursed_at.slice(0, 10)}` : 'Belum dibayar'}
             </span>
             <button
               type="button"
-              className="secondary"
+              className="secondary btn-sm"
               onClick={handleToggleReimburse}
               disabled={togglingReimburse}
             >
-              {expense.reimbursed_at ? 'Batalkan tanda lunas' : 'Tandai sudah dibayar'}
+              {expense.reimbursed_at ? 'Batalkan lunas' : 'Tandai lunas'}
             </button>
           </div>
         )}
@@ -175,6 +193,9 @@ function EditExpensePage() {
         <div className="row">
           <button type="submit" disabled={submitting}>
             {submitting ? 'Menyimpan...' : 'Simpan'}
+          </button>
+          <button type="button" className="secondary" onClick={() => navigate({ to: '/expenses' })}>
+            Batal
           </button>
           <button type="button" className="danger" onClick={handleDelete} disabled={submitting}>
             Hapus

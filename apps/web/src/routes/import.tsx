@@ -37,17 +37,22 @@ function ImportPage() {
 
   return (
     <main className="page container">
-      <h1>Import CSV</h1>
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <p className="muted">
-          Kolom wajib: <code>date</code> (YYYY-MM-DD), <code>category</code>,{' '}
-          <code>detail</code>, <code>amount</code>, <code>notes</code> (opsional),{' '}
-          <code>user</code> (username yang sudah terdaftar). Kategori baru otomatis dibuat;
-          username yang tidak dikenal akan ditolak per baris.
-        </p>
+      <div className="page-head">
+        <div>
+          <h1>Import CSV</h1>
+          <p className="page-subtitle">Upload data pengeluaran secara massal</p>
+        </div>
       </div>
+
       <form className="stack card" onSubmit={handleSubmit}>
         {error && <div className="error">{error}</div>}
+
+        <div className="info-box">
+          <strong>Format kolom:</strong> <code>date</code> (YYYY-MM-DD), <code>category</code>,{' '}
+          <code>detail</code>, <code>amount</code>, <code>notes</code> (opsional), <code>user</code>{' '}
+          (username terdaftar). Kategori baru dibuat otomatis; username tak dikenal ditolak per baris.
+        </div>
+
         <div className="field">
           <label htmlFor="file">File CSV</label>
           <input
@@ -58,35 +63,42 @@ function ImportPage() {
             required
           />
         </div>
+
         <button type="submit" disabled={submitting || !file}>
           {submitting ? 'Mengunggah...' : 'Import'}
         </button>
       </form>
 
       {result && (
-        <div className="card" style={{ marginTop: '1rem' }}>
-          <p>
-            <strong>{result.inserted}</strong> baris berhasil diimport.
+        <div className="card" style={{ marginTop: '1.25rem' }}>
+          <p className="result-summary">
+            <span>✅</span> {result.inserted} baris berhasil diimport
           </p>
           {result.errors.length > 0 && (
             <>
-              <p className="muted">{result.errors.length} baris gagal:</p>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Baris</th>
-                    <th>Error</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.errors.map((e) => (
-                    <tr key={e.row}>
-                      <td>{e.row}</td>
-                      <td>{e.error}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <p className="muted" style={{ marginBottom: '0.75rem' }}>
+                {result.errors.length} baris gagal:
+              </p>
+              <div className="table-wrap">
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Baris</th>
+                        <th>Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.errors.map((e) => (
+                        <tr key={e.row} style={{ cursor: 'default' }}>
+                          <td>{e.row}</td>
+                          <td style={{ whiteSpace: 'normal' }}>{e.error}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </>
           )}
         </div>

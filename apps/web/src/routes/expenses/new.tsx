@@ -88,9 +88,16 @@ function NewExpensePage() {
 
   return (
     <main className="page container">
-      <h1>Tambah Pengeluaran</h1>
+      <div className="page-head">
+        <div>
+          <h1>Tambah Pengeluaran</h1>
+          <p className="page-subtitle">Catat pengeluaran baru</p>
+        </div>
+      </div>
+
       <form className="stack card" onSubmit={handleSubmit}>
         {error && <div className="error">{error}</div>}
+
         <div className="field">
           <label htmlFor="date">Tanggal</label>
           <input
@@ -101,6 +108,7 @@ function NewExpensePage() {
             required
           />
         </div>
+
         <div className="field">
           <label htmlFor="category">Kategori</label>
           <select
@@ -115,21 +123,34 @@ function NewExpensePage() {
               </option>
             ))}
           </select>
-          <div className="row">
+          <div className="row" style={{ marginTop: '0.5rem', flexWrap: 'nowrap' }}>
             <input
               placeholder="Kategori baru..."
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
             />
-            <button type="button" className="secondary" onClick={handleAddCategory}>
-              + Kategori
+            <button
+              type="button"
+              className="secondary"
+              onClick={handleAddCategory}
+              disabled={!newCategory.trim()}
+            >
+              Tambah
             </button>
           </div>
         </div>
+
         <div className="field">
           <label htmlFor="detail">Untuk</label>
-          <input id="detail" value={detail} onChange={(e) => setDetail(e.target.value)} required />
+          <input
+            id="detail"
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            placeholder="Makan siang, bensin, ..."
+            required
+          />
         </div>
+
         <div className="field">
           <label htmlFor="amount">Nominal (Rp)</label>
           <input
@@ -137,13 +158,22 @@ function NewExpensePage() {
             inputMode="numeric"
             value={amount}
             onChange={handleAmountChange}
+            placeholder="0"
             required
           />
         </div>
+
         <div className="field">
           <label htmlFor="notes">Keterangan (opsional)</label>
-          <textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+          <textarea
+            id="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Catatan tambahan..."
+          />
         </div>
+
         <label className="checkbox-field">
           <input
             type="checkbox"
@@ -152,9 +182,15 @@ function NewExpensePage() {
           />
           Perlu direimburse pasangan
         </label>
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Menyimpan...' : 'Simpan'}
-        </button>
+
+        <div className="row">
+          <button type="submit" disabled={submitting}>
+            {submitting ? 'Menyimpan...' : 'Simpan'}
+          </button>
+          <button type="button" className="secondary" onClick={() => navigate({ to: '/expenses' })}>
+            Batal
+          </button>
+        </div>
       </form>
     </main>
   )

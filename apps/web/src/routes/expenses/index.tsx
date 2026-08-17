@@ -17,7 +17,8 @@ type ExpensesSearch = {
 const PAGE_SIZE = 50
 
 const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ]
 
 function formatRupiah(amount: number) {
@@ -26,6 +27,11 @@ function formatRupiah(amount: number) {
     currency: 'IDR',
     maximumFractionDigits: 0,
   }).format(amount)
+}
+
+function formatDate(iso: string) {
+  const [year, month, day] = iso.split('-')
+  return `${day} ${MONTHS[Number(month) - 1]?.slice(0, 3)} ${year}`
 }
 
 export const Route = createFileRoute('/expenses/')({
@@ -58,9 +64,13 @@ function ExpensesPage() {
   const { expenses, categories, users } = Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
   const [searchInput, setSearchInput] = useState(search.q ?? '')
-  const activeFilterCount = [search.year, search.month, search.user_id, search.category_id, search.q].filter(
-    (v) => v !== undefined && v !== '',
-  ).length
+  const activeFilterCount = [
+    search.year,
+    search.month,
+    search.user_id,
+    search.category_id,
+    search.q,
+  ].filter((v) => v !== undefined && v !== '').length
   const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0)
 
   // debounce the search box so typing doesn't fire a server function per keystroke
@@ -86,15 +96,25 @@ function ExpensesPage() {
   const userById = new Map(users.map((u: UserSummary) => [u.id, u.display_name]))
 
   const totalAmount = expenses.reduce((sum: number, e: Expense) => sum + e.amount, 0)
-  const pendingReimburse = expenses.filter((e: Expense) => e.needs_reimburse && !e.reimbursed_at).length
+  const pendingReimburse = expenses.filter(
+    (e: Expense) => e.needs_reimburse && !e.reimbursed_at,
+  ).length
 
   return (
     <main className="page container">
-      <h1>Riwayat Pengeluaran</h1>
+      <div className="page-head">
+        <div>
+          <h1>Riwayat Pengeluaran</h1>
+          <p className="page-subtitle">Catatan pengeluaran rumah tangga</p>
+        </div>
+        <Link to="/expenses/new" className="btn">
+          + Tambah
+        </Link>
+      </div>
 
       <div className="stat-row">
         <div className="stat-card">
-          <span className="stat-label">Total ditampilkan</span>
+          <span className="stat-label">Total</span>
           <span className="stat-value">{formatRupiah(totalAmount)}</span>
         </div>
         <div className="stat-card">
@@ -103,7 +123,7 @@ function ExpensesPage() {
         </div>
         {pendingReimburse > 0 && (
           <div className="stat-card stat-card-warn">
-            <span className="stat-label">Belum direimburse</span>
+            <span className="stat-label">Belum reimburse</span>
             <span className="stat-value">{pendingReimburse}</span>
           </div>
         )}
@@ -118,11 +138,20 @@ function ExpensesPage() {
           >
             Filter
             {activeFilterCount > 0 && <span className="filter-count">{activeFilterCount}</span>}
-            {filtersOpen ? '▲' : '▼'}
+            <span className="filter-caret">{filtersOpen ? '▲' : '▼'}</span>
           </button>
-          <Link to="/expenses/new" className="btn">
-            + Tambah
-          </Link>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              className="secondary btn-sm"
+              onClick={() => {
+                setSearchInput('')
+                navigate({ search: { sort: search.sort, page: 1 } })
+              }}
+            >
+              Reset
+            </button>
+          )}
         </div>
 
         {filtersOpen && (
@@ -157,7 +186,7 @@ function ExpensesPage() {
                   updateFilter({ month: e.target.value ? Number(e.target.value) : undefined })
                 }
               >
-                <option value="">Semua</option>
+                <option value="">Semua bulan</option>
                 {MONTHS.map((m, i) => (
                   <option key={m} value={i + 1}>
                     {m}
@@ -174,7 +203,7 @@ function ExpensesPage() {
                   updateFilter({ user_id: e.target.value ? Number(e.target.value) : undefined })
                 }
               >
-                <option value="">Semua</option>
+                <option value="">Semua orang</option>
                 {users.map((u: UserSummary) => (
                   <option key={u.id} value={u.id}>
                     {u.display_name}
@@ -191,7 +220,7 @@ function ExpensesPage() {
                   updateFilter({ category_id: e.target.value ? Number(e.target.value) : undefined })
                 }
               >
-                <option value="">Semua</option>
+                <option value="">Semua kategori</option>
                 {categories.map((c: Category) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -204,76 +233,89 @@ function ExpensesPage() {
       </div>
 
       {expenses.length === 0 ? (
-        <p className="muted">Belum ada data untuk filter ini.</p>
+        <div className="card empty-state">
+          <span className="empty-icon">🧾</span>
+          <p>Belum ada pengeluaran yang cocok dengan filter ini.</p>
+          <Link to="/expenses/new" className="btn">
+            Tambah pengeluaran
+          </Link>
+        </div>
       ) : (
         <>
           <p className="table-hint">↔ Geser tabel buat lihat kolom lainnya</p>
-          <div className="card table-card">
-            <table className="expenses-table">
-            <thead>
-              <tr>
-                <th className="sortable" onClick={toggleSort}>
-                  Tanggal {search.sort === 'asc' ? '↑' : '↓'}
-                </th>
-                <th>Kategori</th>
-                <th>Untuk</th>
-                <th className="amount">Nominal</th>
-                <th>Keterangan</th>
-                <th>Reimburse</th>
-                <th>Orang</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expenses.map((e: Expense) => (
-                <tr
-                  key={e.id}
-                  className="row-link"
-                  onClick={() => navigate({ to: '/expenses/$id/edit', params: { id: String(e.id) } })}
-                >
-                  <td data-label="Tanggal">{e.expense_date}</td>
-                  <td data-label="Kategori">{categoryById.get(e.category_id) ?? '-'}</td>
-                  <td data-label="Untuk">{e.detail}</td>
-                  <td data-label="Nominal" className="amount">
-                    {formatRupiah(e.amount)}
-                  </td>
-                  <td data-label="Keterangan">{e.notes ?? ''}</td>
-                  <td data-label="Reimburse">
-                    {e.needs_reimburse ? (
-                      <span className={e.reimbursed_at ? 'badge badge-paid' : 'badge badge-pending'}>
-                        {e.reimbursed_at ? 'Lunas' : 'Belum'}
-                      </span>
-                    ) : (
-                      <span className="muted">-</span>
-                    )}
-                  </td>
-                  <td data-label="Orang">{userById.get(e.user_id) ?? '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-            </table>
+          <div className="table-wrap">
+            <div className="table-scroll">
+              <table className="expenses-table">
+                <thead>
+                  <tr>
+                    <th className="sortable" onClick={toggleSort}>
+                      Tanggal {search.sort === 'asc' ? '↑' : '↓'}
+                    </th>
+                    <th>Kategori</th>
+                    <th>Untuk</th>
+                    <th className="amount">Nominal</th>
+                    <th>Keterangan</th>
+                    <th>Reimburse</th>
+                    <th>Orang</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.map((e: Expense) => (
+                    <tr
+                      key={e.id}
+                      onClick={() =>
+                        navigate({ to: '/expenses/$id/edit', params: { id: String(e.id) } })
+                      }
+                    >
+                      <td>{formatDate(e.expense_date)}</td>
+                      <td>{categoryById.get(e.category_id) ?? '-'}</td>
+                      <td>{e.detail}</td>
+                      <td className="amount">{formatRupiah(e.amount)}</td>
+                      <td>{e.notes || <span className="muted">—</span>}</td>
+                      <td>
+                        {e.needs_reimburse ? (
+                          <span
+                            className={e.reimbursed_at ? 'badge badge-paid' : 'badge badge-pending'}
+                          >
+                            {e.reimbursed_at ? 'Lunas' : 'Belum'}
+                          </span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td>{userById.get(e.user_id) ?? '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="pagination">
+            <button
+              type="button"
+              className="secondary"
+              disabled={(search.page ?? 1) <= 1}
+              onClick={() =>
+                navigate({ search: (prev) => ({ ...prev, page: (prev.page ?? 1) - 1 }) })
+              }
+            >
+              ← Sebelumnya
+            </button>
+            <span className="muted">Halaman {search.page ?? 1}</span>
+            <button
+              type="button"
+              className="secondary"
+              disabled={expenses.length < PAGE_SIZE}
+              onClick={() =>
+                navigate({ search: (prev) => ({ ...prev, page: (prev.page ?? 1) + 1 }) })
+              }
+            >
+              Berikutnya →
+            </button>
           </div>
         </>
       )}
-
-      <div className="pagination">
-        <button
-          type="button"
-          className="secondary"
-          disabled={(search.page ?? 1) <= 1}
-          onClick={() => navigate({ search: (prev) => ({ ...prev, page: (prev.page ?? 1) - 1 }) })}
-        >
-          Sebelumnya
-        </button>
-        <span className="muted">Halaman {search.page ?? 1}</span>
-        <button
-          type="button"
-          className="secondary"
-          disabled={expenses.length < PAGE_SIZE}
-          onClick={() => navigate({ search: (prev) => ({ ...prev, page: (prev.page ?? 1) + 1 }) })}
-        >
-          Berikutnya
-        </button>
-      </div>
     </main>
   )
 }

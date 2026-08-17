@@ -24,7 +24,7 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
           <button
             type="button"
             className={`nav-toggle ${open ? 'is-open' : ''}`}
-            aria-label="Buka menu"
+            aria-label={open ? 'Tutup menu' : 'Buka menu'}
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
           >
@@ -47,7 +47,7 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
               <Link to="/import" onClick={() => setOpen(false)}>
                 Import
               </Link>
-              <span className="muted nav-user">{user.display_name}</span>
+              <span className="nav-user">{user.display_name}</span>
               <button type="button" className="secondary" onClick={handleLogout}>
                 Logout
               </button>
