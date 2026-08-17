@@ -206,8 +206,10 @@ function ExpensesPage() {
       {expenses.length === 0 ? (
         <p className="muted">Belum ada data untuk filter ini.</p>
       ) : (
-        <div className="card table-card">
-          <table className="expenses-table">
+        <>
+          <p className="table-hint">↔ Geser tabel buat lihat kolom lainnya</p>
+          <div className="card table-card">
+            <table className="expenses-table">
             <thead>
               <tr>
                 <th className="sortable" onClick={toggleSort}>
@@ -248,8 +250,9 @@ function ExpensesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+            </table>
+          </div>
+        </>
       )}
 
       <div className="pagination">

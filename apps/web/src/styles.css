@@ -395,9 +395,23 @@ button.danger:hover, .btn.danger:hover {
 /* ---- Table (horizontal-scroll, spreadsheet-style) ---- */
 
 .table-card {
+  position: relative;
   padding: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* fade hint on the right edge so the cut-off column reads as "scroll for
+   more", not as a hard, broken-looking clip */
+.table-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 28px;
+  background: linear-gradient(to right, transparent, var(--surface));
+  pointer-events: none;
 }
 
 table {
@@ -458,6 +472,18 @@ td.amount, th.amount {
 .expenses-table td:first-child {
   z-index: 1;
   font-weight: 600;
+}
+
+/* breathing room once the user scrolls all the way to the last column */
+.expenses-table th:last-child,
+.expenses-table td:last-child {
+  padding-right: 1.5rem;
+}
+
+.table-hint {
+  display: none;
+  padding: 0.6rem 0.9rem 0;
+  font-size: 0.8rem;
 }
 
 tr.row-link {
@@ -593,5 +619,12 @@ tbody tr:last-child td {
   .stat-card {
     flex: 0 0 auto;
     min-width: 150px;
+  }
+
+  .table-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-muted);
   }
 }
