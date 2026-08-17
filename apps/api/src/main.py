@@ -14,5 +14,5 @@ app.include_router(imports.router)
 async def health(request: Request):
     env = request.scope["env"]
     results = await env.DB.prepare("SELECT 1 AS ok").all()
-    row = results.results[0].to_py()
+    row = results.results[0]
     return {"status": "ok", "d1": dict(row)}
