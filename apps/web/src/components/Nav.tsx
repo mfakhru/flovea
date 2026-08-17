@@ -23,14 +23,16 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
         {user && (
           <button
             type="button"
-            className="nav-toggle"
+            className={`nav-toggle ${open ? 'is-open' : ''}`}
             aria-label="Buka menu"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
           >
-            <span />
-            <span />
-            <span />
+            <span className="nav-toggle-bars">
+              <span />
+              <span />
+              <span />
+            </span>
           </button>
         )}
         <div className={`links ${open ? 'links-open' : ''}`}>
