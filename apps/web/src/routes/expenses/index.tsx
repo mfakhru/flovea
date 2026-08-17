@@ -58,6 +58,10 @@ function ExpensesPage() {
   const { expenses, categories, users } = Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
   const [searchInput, setSearchInput] = useState(search.q ?? '')
+  const activeFilterCount = [search.year, search.month, search.user_id, search.category_id, search.q].filter(
+    (v) => v !== undefined && v !== '',
+  ).length
+  const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0)
 
   // debounce the search box so typing doesn't fire a server function per keystroke
   useEffect(() => {
@@ -105,82 +109,98 @@ function ExpensesPage() {
         )}
       </div>
 
-      <div className="filters card">
-        <div className="field">
-          <label htmlFor="f-search">Cari</label>
-          <input
-            id="f-search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="untuk / keterangan..."
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="f-year">Tahun</label>
-          <input
-            id="f-year"
-            type="number"
-            value={search.year ?? ''}
-            onChange={(e) =>
-              updateFilter({ year: e.target.value ? Number(e.target.value) : undefined })
-            }
-            placeholder="2026"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="f-month">Bulan</label>
-          <select
-            id="f-month"
-            value={search.month ?? ''}
-            onChange={(e) =>
-              updateFilter({ month: e.target.value ? Number(e.target.value) : undefined })
-            }
+      <div className="filters-card card">
+        <div className="filters-header">
+          <button
+            type="button"
+            className="secondary filter-toggle"
+            onClick={() => setFiltersOpen((v) => !v)}
           >
-            <option value="">Semua</option>
-            {MONTHS.map((m, i) => (
-              <option key={m} value={i + 1}>
-                {m}
-              </option>
-            ))}
-          </select>
+            Filter
+            {activeFilterCount > 0 && <span className="filter-count">{activeFilterCount}</span>}
+            {filtersOpen ? '▲' : '▼'}
+          </button>
+          <Link to="/expenses/new" className="btn">
+            + Tambah
+          </Link>
         </div>
-        <div className="field">
-          <label htmlFor="f-user">Orang</label>
-          <select
-            id="f-user"
-            value={search.user_id ?? ''}
-            onChange={(e) =>
-              updateFilter({ user_id: e.target.value ? Number(e.target.value) : undefined })
-            }
-          >
-            <option value="">Semua</option>
-            {users.map((u: UserSummary) => (
-              <option key={u.id} value={u.id}>
-                {u.display_name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="f-category">Kategori</label>
-          <select
-            id="f-category"
-            value={search.category_id ?? ''}
-            onChange={(e) =>
-              updateFilter({ category_id: e.target.value ? Number(e.target.value) : undefined })
-            }
-          >
-            <option value="">Semua</option>
-            {categories.map((c: Category) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <Link to="/expenses/new" className="btn">
-          + Tambah
-        </Link>
+
+        {filtersOpen && (
+          <div className="filters">
+            <div className="field">
+              <label htmlFor="f-search">Cari</label>
+              <input
+                id="f-search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="untuk / keterangan..."
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="f-year">Tahun</label>
+              <input
+                id="f-year"
+                type="number"
+                value={search.year ?? ''}
+                onChange={(e) =>
+                  updateFilter({ year: e.target.value ? Number(e.target.value) : undefined })
+                }
+                placeholder="2026"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="f-month">Bulan</label>
+              <select
+                id="f-month"
+                value={search.month ?? ''}
+                onChange={(e) =>
+                  updateFilter({ month: e.target.value ? Number(e.target.value) : undefined })
+                }
+              >
+                <option value="">Semua</option>
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={i + 1}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="f-user">Orang</label>
+              <select
+                id="f-user"
+                value={search.user_id ?? ''}
+                onChange={(e) =>
+                  updateFilter({ user_id: e.target.value ? Number(e.target.value) : undefined })
+                }
+              >
+                <option value="">Semua</option>
+                {users.map((u: UserSummary) => (
+                  <option key={u.id} value={u.id}>
+                    {u.display_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="f-category">Kategori</label>
+              <select
+                id="f-category"
+                value={search.category_id ?? ''}
+                onChange={(e) =>
+                  updateFilter({ category_id: e.target.value ? Number(e.target.value) : undefined })
+                }
+              >
+                <option value="">Semua</option>
+                {categories.map((c: Category) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {expenses.length === 0 ? (

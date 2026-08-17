@@ -257,7 +257,7 @@ button, .btn {
   font-weight: 700;
   cursor: pointer;
   padding: 0.6rem 1.2rem;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--primary);
   background: var(--primary);
   color: #fff;
@@ -317,20 +317,49 @@ button.danger:hover, .btn.danger:hover {
 
 /* ---- Filters ---- */
 
+.filters-card {
+  margin-bottom: 1.25rem;
+}
+
+.filters-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .filters {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
   align-items: end;
-  margin-bottom: 1.25rem;
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border);
 }
 
 .filters .field {
   min-width: 130px;
-}
-
-.filters .btn {
-  align-self: center;
 }
 
 /* ---- Badges ---- */
@@ -503,6 +532,10 @@ tbody tr:last-child td {
 /* ---- Mobile ---- */
 
 @media (max-width: 640px) {
+  .container {
+    padding: 0 1.25rem;
+  }
+
   .nav-toggle {
     display: flex;
   }
