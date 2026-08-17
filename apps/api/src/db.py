@@ -1,0 +1,22 @@
+"""Small helpers around the D1 binding's prepare/bind/all/run JS API."""
+
+
+async def fetch_all(db, sql, *params):
+    stmt = db.prepare(sql)
+    if params:
+        stmt = stmt.bind(*params)
+    result = await stmt.all()
+    return [row.to_py() for row in result.results]
+
+
+async def fetch_one(db, sql, *params):
+    rows = await fetch_all(db, sql, *params)
+    return rows[0] if rows else None
+
+
+async def execute(db, sql, *params):
+    stmt = db.prepare(sql)
+    if params:
+        stmt = stmt.bind(*params)
+    result = await stmt.run()
+    return result.meta.to_py()

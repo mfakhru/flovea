@@ -1,0 +1,20 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "flovea-api",
+	"main": "src/entry.py",
+	"compatibility_date": "2025-11-02",
+	"compatibility_flags": [
+		"python_workers",
+		"python_dedicated_snapshot"
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "flovea-db",
+			"database_id": "b58e3514-59b2-457e-ac10-4e8b9cf40e22"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
+}

@@ -1,0 +1,13 @@
+node_modules/
+.venv/
+.wrangler/
+.dev.vars
+.dev.vars.*
+__pycache__/
+*.pyc
+.env
+.env.*
+plan-dev.md
+
+# contains real password hashes for the 2 household accounts — public repo, keep local-only
+apps/api/migrations/0003_seed_users.sql
