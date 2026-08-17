@@ -33,34 +33,40 @@ function LoginPage() {
   }
 
   return (
-    <main className="page container">
-      <h1>Login</h1>
-      <form className="stack card" onSubmit={handleSubmit}>
-        {error && <div className="error">{error}</div>}
-        <div className="field">
-          <label htmlFor="username">Username</label>
-          <input
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            autoFocus
-          />
+    <main className="auth-page">
+      <div className="auth-card card">
+        <div className="auth-brand">
+          <span className="auth-logo">🌿</span>
+          <h1>Flovea</h1>
+          <p className="muted">Masuk buat catat pengeluaran</p>
         </div>
-        <div className="field">
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Masuk...' : 'Masuk'}
-        </button>
-      </form>
+        <form className="stack" onSubmit={handleSubmit}>
+          {error && <div className="error">{error}</div>}
+          <div className="field">
+            <label htmlFor="username">Username</label>
+            <input
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" disabled={submitting}>
+            {submitting ? 'Masuk...' : 'Masuk'}
+          </button>
+        </form>
+      </div>
     </main>
   )
 }

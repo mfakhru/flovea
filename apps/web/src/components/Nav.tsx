@@ -18,7 +18,7 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
     <nav className="app-nav">
       <div className="container nav-row">
         <Link to={user ? '/expenses' : '/login'} className="brand" onClick={() => setOpen(false)}>
-          Flovea
+          <span className="brand-logo">🌿</span> Flovea
         </Link>
         {user && (
           <button

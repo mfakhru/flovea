@@ -81,9 +81,29 @@ function ExpensesPage() {
   const categoryById = new Map(categories.map((c: Category) => [c.id, c.name]))
   const userById = new Map(users.map((u: UserSummary) => [u.id, u.display_name]))
 
+  const totalAmount = expenses.reduce((sum: number, e: Expense) => sum + e.amount, 0)
+  const pendingReimburse = expenses.filter((e: Expense) => e.needs_reimburse && !e.reimbursed_at).length
+
   return (
     <main className="page container">
       <h1>Riwayat Pengeluaran</h1>
+
+      <div className="stat-row">
+        <div className="stat-card">
+          <span className="stat-label">Total ditampilkan</span>
+          <span className="stat-value">{formatRupiah(totalAmount)}</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Transaksi</span>
+          <span className="stat-value">{expenses.length}</span>
+        </div>
+        {pendingReimburse > 0 && (
+          <div className="stat-card stat-card-warn">
+            <span className="stat-label">Belum direimburse</span>
+            <span className="stat-value">{pendingReimburse}</span>
+          </div>
+        )}
+      </div>
 
       <div className="filters card">
         <div className="field">
