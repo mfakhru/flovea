@@ -49,6 +49,17 @@ class ExpenseOut(BaseModel):
     created_at: str
 
 
+class UserTotal(BaseModel):
+    user_id: int
+    display_name: str
+    total: int
+
+
+class ExpenseSummary(BaseModel):
+    by_user: list[UserTotal]
+    pending_reimburse: int
+
+
 class ImportError(BaseModel):
     row: int
     error: str

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { requireUser } from '../../lib/auth'
-import { listCategories, listExpenses, listUsers } from '../../lib/expenses'
+import { getExpensesSummary, listCategories, listExpenses, listUsers } from '../../lib/expenses'
 import type { Category, Expense, UserSummary } from '../../lib/expenses'
 
 type ExpensesSearch = {
@@ -49,19 +49,22 @@ export const Route = createFileRoute('/expenses/')({
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const [expenses, categories, users] = await Promise.all([
+    const [expenses, categories, users, summary] = await Promise.all([
       listExpenses({ data: deps }),
       listCategories(),
       listUsers(),
+      getExpensesSummary({
+        data: { year: deps.year, month: deps.month, category_id: deps.category_id, q: deps.q },
+      }),
     ])
-    return { expenses, categories, users }
+    return { expenses, categories, users, summary }
   },
   component: ExpensesPage,
 })
 
 function ExpensesPage() {
   const search = Route.useSearch()
-  const { expenses, categories, users } = Route.useLoaderData()
+  const { expenses, categories, users, summary } = Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
   const [searchInput, setSearchInput] = useState(search.q ?? '')
   const activeFilterCount = [
@@ -95,10 +98,9 @@ function ExpensesPage() {
   const categoryById = new Map(categories.map((c: Category) => [c.id, c.name]))
   const userById = new Map(users.map((u: UserSummary) => [u.id, u.display_name]))
 
-  const totalAmount = expenses.reduce((sum: number, e: Expense) => sum + e.amount, 0)
-  const pendingReimburse = expenses.filter(
-    (e: Expense) => e.needs_reimburse && !e.reimbursed_at,
-  ).length
+  const suamiTotal = summary.by_user.find((u) => u.display_name === 'Suami')?.total ?? 0
+  const istriTotal = summary.by_user.find((u) => u.display_name === 'Istri')?.total ?? 0
+  const saldo = suamiTotal - istriTotal
 
   return (
     <main className="page container">
@@ -114,17 +116,25 @@ function ExpensesPage() {
 
       <div className="stat-row">
         <div className="stat-card">
-          <span className="stat-label">Total</span>
-          <span className="stat-value">{formatRupiah(totalAmount)}</span>
+          <span className="stat-label">Total Suami</span>
+          <span className="stat-value">{formatRupiah(suamiTotal)}</span>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Transaksi</span>
-          <span className="stat-value">{expenses.length}</span>
+          <span className="stat-label">Total Istri</span>
+          <span className="stat-value">{formatRupiah(istriTotal)}</span>
         </div>
-        {pendingReimburse > 0 && (
+        <div className="stat-card">
+          <span className="stat-label">Saldo</span>
+          <span className="stat-value">
+            {saldo === 0
+              ? 'Seimbang'
+              : `${saldo > 0 ? 'Suami' : 'Istri'} +${formatRupiah(Math.abs(saldo))}`}
+          </span>
+        </div>
+        {summary.pending_reimburse > 0 && (
           <div className="stat-card stat-card-warn">
-            <span className="stat-label">Belum reimburse</span>
-            <span className="stat-value">{pendingReimburse}</span>
+            <span className="stat-label">Perlu dibayarkan</span>
+            <span className="stat-value">{formatRupiah(summary.pending_reimburse)}</span>
           </div>
         )}
       </div>

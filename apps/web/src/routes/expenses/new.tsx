@@ -1,14 +1,14 @@
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
-import { requireUser } from '../../lib/auth'
+import { SUAMI_DISPLAY_NAME, requireUser } from '../../lib/auth'
 import { createCategory, createExpense, listCategories } from '../../lib/expenses'
 import type { Category } from '../../lib/expenses'
 
 export const Route = createFileRoute('/expenses/new')({
-  beforeLoad: async () => {
-    await requireUser()
+  loader: async () => {
+    const [user, categories] = await Promise.all([requireUser(), listCategories()])
+    return { user, categories }
   },
-  loader: async () => ({ categories: await listCategories() }),
   component: NewExpensePage,
 })
 
@@ -21,7 +21,8 @@ function formatThousands(digits: string) {
 }
 
 function NewExpensePage() {
-  const { categories: initialCategories } = Route.useLoaderData()
+  const { user, categories: initialCategories } = Route.useLoaderData()
+  const canReimburse = user.display_name === SUAMI_DISPLAY_NAME
   const navigate = useNavigate()
   const router = useRouter()
   const [categories, setCategories] = useState<Category[]>(initialCategories)
@@ -174,14 +175,16 @@ function NewExpensePage() {
           />
         </div>
 
-        <label className="checkbox-field">
-          <input
-            type="checkbox"
-            checked={needsReimburse}
-            onChange={(e) => setNeedsReimburse(e.target.checked)}
-          />
-          Perlu direimburse pasangan
-        </label>
+        {canReimburse && (
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={needsReimburse}
+              onChange={(e) => setNeedsReimburse(e.target.checked)}
+            />
+            Perlu direimburse Istri
+          </label>
+        )}
 
         <div className="row">
           <button type="submit" disabled={submitting}>

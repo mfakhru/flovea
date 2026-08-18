@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
-import { requireUser } from '../../lib/auth'
+import { SUAMI_DISPLAY_NAME, requireUser } from '../../lib/auth'
 import {
   deleteExpense,
   getExpense,
   listCategories,
+  listUsers,
   toggleReimburse,
   updateExpense,
 } from '../../lib/expenses'
@@ -15,11 +16,12 @@ export const Route = createFileRoute('/expenses/$id/edit')({
   },
   loader: async ({ params }) => {
     const id = Number(params.id)
-    const [expense, categories] = await Promise.all([
+    const [expense, categories, users] = await Promise.all([
       getExpense({ data: { id } }),
       listCategories(),
+      listUsers(),
     ])
-    return { expense, categories }
+    return { expense, categories, users }
   },
   component: EditExpensePage,
 })
@@ -29,7 +31,9 @@ function formatThousands(digits: string) {
 }
 
 function EditExpensePage() {
-  const { expense: initialExpense, categories } = Route.useLoaderData()
+  const { expense: initialExpense, categories, users } = Route.useLoaderData()
+  const owner = users.find((u) => u.id === initialExpense.user_id)
+  const canReimburse = owner?.display_name === SUAMI_DISPLAY_NAME
   const navigate = useNavigate()
   const router = useRouter()
   const [expense, setExpense] = useState(initialExpense)
@@ -165,14 +169,16 @@ function EditExpensePage() {
           <textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </div>
 
-        <label className="checkbox-field">
-          <input
-            type="checkbox"
-            checked={needsReimburse}
-            onChange={(e) => setNeedsReimburse(e.target.checked)}
-          />
-          Perlu direimburse pasangan
-        </label>
+        {canReimburse && (
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={needsReimburse}
+              onChange={(e) => setNeedsReimburse(e.target.checked)}
+            />
+            Perlu direimburse Istri
+          </label>
+        )}
 
         {expense.needs_reimburse && (
           <div className="reimburse-box">

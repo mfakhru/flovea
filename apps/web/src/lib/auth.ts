@@ -8,6 +8,10 @@ export type CurrentUser = {
   display_name: string
 }
 
+// Reimbursement only flows Suami -> Istri; must match the backend check
+// in apps/api/src/routers/expenses.py.
+export const SUAMI_DISPLAY_NAME = 'Suami'
+
 export const getCurrentUser = createServerFn({ method: 'GET' }).handler(
   async (): Promise<CurrentUser | null> => {
     try {
