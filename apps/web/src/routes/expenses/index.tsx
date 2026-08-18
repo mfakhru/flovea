@@ -100,7 +100,6 @@ function ExpensesPage() {
 
   const suamiTotal = summary.by_user.find((u) => u.display_name === 'Suami')?.total ?? 0
   const istriTotal = summary.by_user.find((u) => u.display_name === 'Istri')?.total ?? 0
-  const saldo = suamiTotal - istriTotal
 
   return (
     <main className="page container">
@@ -122,15 +121,6 @@ function ExpensesPage() {
         <div className="stat-card">
           <span className="stat-label">Total Istri</span>
           <span className="stat-value">{formatRupiah(istriTotal)}</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Selisih</span>
-          <span className="stat-value">{formatRupiah(Math.abs(saldo))}</span>
-          {saldo !== 0 && (
-            <span className="stat-sub">
-              {saldo > 0 ? 'Suami lebih banyak keluar' : 'Istri lebih banyak keluar'}
-            </span>
-          )}
         </div>
         {summary.pending_reimburse > 0 && (
           <div className="stat-card stat-card-warn">
