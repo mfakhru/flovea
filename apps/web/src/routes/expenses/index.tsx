@@ -124,12 +124,13 @@ function ExpensesPage() {
           <span className="stat-value">{formatRupiah(istriTotal)}</span>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Saldo</span>
-          <span className="stat-value">
-            {saldo === 0
-              ? 'Seimbang'
-              : `${saldo > 0 ? 'Suami' : 'Istri'} +${formatRupiah(Math.abs(saldo))}`}
-          </span>
+          <span className="stat-label">Selisih</span>
+          <span className="stat-value">{formatRupiah(Math.abs(saldo))}</span>
+          {saldo !== 0 && (
+            <span className="stat-sub">
+              {saldo > 0 ? 'Suami lebih banyak keluar' : 'Istri lebih banyak keluar'}
+            </span>
+          )}
         </div>
         {summary.pending_reimburse > 0 && (
           <div className="stat-card stat-card-warn">

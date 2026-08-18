@@ -331,6 +331,12 @@ main.page {
   font-variant-numeric: tabular-nums;
 }
 
+.stat-sub {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .stat-card-warn {
   background: var(--warn-bg);
   border-color: var(--warn-border);
