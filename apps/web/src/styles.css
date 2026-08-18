@@ -420,6 +420,12 @@ input[type='file'] {
 }
 
 input[type='date'] {
+  /* iOS Safari renders type=date as an oversized native capsule that
+     ignores our height/padding unless the default appearance is
+     stripped first */
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
   padding-right: 0.5rem;
 }
 
