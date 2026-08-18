@@ -420,7 +420,27 @@ input[type='file'] {
 }
 
 input[type='date'] {
-  padding-right: 0.75rem;
+  padding-right: 0.5rem;
+}
+
+/* Chrome/Android renders this icon oversized relative to the field by
+   default — pin it to a sane, consistent size */
+input[type='date']::-webkit-calendar-picker-indicator {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin-left: 0.375rem;
+  background-size: 18px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+input[type='date']::-webkit-datetime-edit {
+  font-size: var(--control-font);
 }
 
 .checkbox-field {
