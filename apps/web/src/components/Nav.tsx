@@ -17,7 +17,7 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
   return (
     <nav className="app-nav">
       <div className="container nav-row">
-        <Link to={user ? '/expenses' : '/login'} className="brand" onClick={() => setOpen(false)}>
+        <Link to={user ? '/' : '/login'} className="brand" onClick={() => setOpen(false)}>
           <span className="brand-logo">🌿</span> Flovea
         </Link>
         {user && (
@@ -38,6 +38,9 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
         <div className={`links ${open ? 'links-open' : ''}`}>
           {user ? (
             <>
+              <Link to="/" onClick={() => setOpen(false)}>
+                Home
+              </Link>
               <Link to="/expenses" onClick={() => setOpen(false)}>
                 Riwayat
               </Link>

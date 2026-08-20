@@ -62,6 +62,18 @@ class ExpenseSummary(BaseModel):
     pending_reimburse: int
 
 
+class CategoryTotal(BaseModel):
+    category_id: int
+    category_name: str
+    total: int
+
+
+class PeriodTotal(BaseModel):
+    pay_period: str
+    by_user: list[UserTotal]
+    total: int
+
+
 class ImportError(BaseModel):
     row: int
     error: str

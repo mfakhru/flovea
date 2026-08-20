@@ -54,6 +54,9 @@ export type SummaryFilters = {
   pay_period?: string
 }
 
+export type CategoryTotal = { category_id: number; category_name: string; total: number }
+export type PeriodTotal = { pay_period: string; by_user: UserTotal[]; total: number }
+
 export const listCategories = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Category[]> => apiJson<Category[]>('/categories'),
 )
@@ -102,6 +105,25 @@ export const getExpensesSummary = createServerFn({ method: 'GET' })
     if (data.q) params.set('q', data.q)
     if (data.pay_period) params.set('pay_period', data.pay_period)
     return apiJson<ExpenseSummary>(`/expenses/summary?${params.toString()}`)
+  })
+
+export const getExpensesByCategory = createServerFn({ method: 'GET' })
+  .validator((filters: SummaryFilters) => filters)
+  .handler(async ({ data }): Promise<CategoryTotal[]> => {
+    const params = new URLSearchParams()
+    if (data.year) params.set('year', String(data.year))
+    if (data.month) params.set('month', String(data.month))
+    if (data.q) params.set('q', data.q)
+    if (data.pay_period) params.set('pay_period', data.pay_period)
+    return apiJson<CategoryTotal[]>(`/expenses/by-category?${params.toString()}`)
+  })
+
+export const getExpensesByPeriod = createServerFn({ method: 'GET' })
+  .validator((data: { limit?: number }) => data)
+  .handler(async ({ data }): Promise<PeriodTotal[]> => {
+    const params = new URLSearchParams()
+    if (data.limit) params.set('limit', String(data.limit))
+    return apiJson<PeriodTotal[]>(`/expenses/by-period?${params.toString()}`)
   })
 
 export const getExpense = createServerFn({ method: 'GET' })

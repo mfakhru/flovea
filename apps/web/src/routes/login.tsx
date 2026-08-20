@@ -5,7 +5,7 @@ import { getCurrentUser, login } from '../lib/auth'
 export const Route = createFileRoute('/login')({
   beforeLoad: async () => {
     const user = await getCurrentUser()
-    if (user) throw redirect({ to: '/expenses' })
+    if (user) throw redirect({ to: '/' })
   },
   component: LoginPage,
 })
@@ -24,7 +24,7 @@ function LoginPage() {
     try {
       await login({ data: { username, password } })
       await router.invalidate()
-      await router.navigate({ to: '/expenses' })
+      await router.navigate({ to: '/' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login gagal')
     } finally {

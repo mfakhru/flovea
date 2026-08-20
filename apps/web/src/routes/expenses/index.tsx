@@ -9,6 +9,7 @@ import {
   listUsers,
 } from '../../lib/expenses'
 import type { Category, Expense, UserSummary } from '../../lib/expenses'
+import { MONTHS, formatDate, formatPeriod, formatRupiah } from '../../lib/format'
 
 type ExpensesSearch = {
   year?: number
@@ -22,30 +23,6 @@ type ExpensesSearch = {
 }
 
 const PAGE_SIZE = 50
-
-const MONTHS = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-]
-
-function formatRupiah(amount: number) {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
-
-function formatDate(iso: string) {
-  const [year, month, day] = iso.split('-')
-  return `${day} ${MONTHS[Number(month) - 1]?.slice(0, 3)} ${year}`
-}
-
-function formatPeriod(period: string) {
-  const [year, month] = period.split('-')
-  const name = MONTHS[Number(month) - 1]
-  return name ? `${name} ${year}` : period
-}
 
 export const Route = createFileRoute('/expenses/')({
   validateSearch: (search: Record<string, unknown>): ExpensesSearch => ({

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from db import execute, fetch_all, fetch_one
-from schemas import ExpenseCreate, ExpenseOut, ExpenseSummary
+from schemas import CategoryTotal, ExpenseCreate, ExpenseOut, ExpenseSummary, PeriodTotal
 from security import get_current_user
 
 router = APIRouter()
@@ -122,6 +122,66 @@ async def get_expenses_summary(
         "by_user": by_user,
         "pending_reimburse": pending_row["total"] if pending_row else 0,
     }
+
+
+@router.get("/expenses/by-category", response_model=list[CategoryTotal])
+async def get_expenses_by_category(
+    request: Request,
+    year: int | None = None,
+    month: int | None = None,
+    q: str | None = None,
+    pay_period: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    env = request.scope["env"]
+    clauses, params = _build_filters(year, month, None, q, pay_period)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    categories = await fetch_all(env.DB, "SELECT id, name FROM categories ORDER BY id")
+    totals_rows = await fetch_all(
+        env.DB,
+        f"SELECT category_id, COALESCE(SUM(amount), 0) AS total FROM expenses {where} GROUP BY category_id",
+        *params,
+    )
+    totals_by_cat = {row["category_id"]: row["total"] for row in totals_rows}
+
+    result = [
+        {"category_id": c["id"], "category_name": c["name"], "total": totals_by_cat.get(c["id"], 0)}
+        for c in categories
+        if totals_by_cat.get(c["id"], 0) > 0
+    ]
+    result.sort(key=lambda r: r["total"], reverse=True)
+    return result
+
+
+@router.get("/expenses/by-period", response_model=list[PeriodTotal])
+async def get_expenses_by_period(
+    request: Request, limit: int = 12, user: dict = Depends(get_current_user)
+):
+    env = request.scope["env"]
+    users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY id")
+    rows = await fetch_all(
+        env.DB,
+        "SELECT pay_period, user_id, COALESCE(SUM(amount), 0) AS total FROM expenses "
+        "WHERE pay_period IS NOT NULL GROUP BY pay_period, user_id",
+    )
+
+    totals_by_period: dict[str, dict[int, int]] = {}
+    for row in rows:
+        totals_by_period.setdefault(row["pay_period"], {})[row["user_id"]] = row["total"]
+
+    periods = sorted(totals_by_period.keys(), reverse=True)[:limit]
+    periods.reverse()
+
+    result = []
+    for period in periods:
+        user_totals = totals_by_period[period]
+        by_user = [
+            {"user_id": u["id"], "display_name": u["display_name"], "total": user_totals.get(u["id"], 0)}
+            for u in users
+        ]
+        result.append({"pay_period": period, "by_user": by_user, "total": sum(user_totals.values())})
+    return result
 
 
 @router.get("/expenses/pay-periods", response_model=list[str])
