@@ -365,6 +365,12 @@ form.stack {
   color: var(--text-soft);
 }
 
+.field-hint {
+  font-size: 0.8125rem;
+  color: var(--text-soft);
+  margin: -0.125rem 0 0;
+}
+
 input,
 select,
 textarea {
@@ -419,8 +425,9 @@ input[type='file'] {
   padding: 0.6875rem 0.875rem;
 }
 
-input[type='date'] {
-  /* iOS Safari renders type=date as an oversized native capsule that
+input[type='date'],
+input[type='month'] {
+  /* iOS Safari renders type=date/month as an oversized native capsule that
      ignores our height/padding unless the default appearance is
      stripped first */
   -webkit-appearance: none;
@@ -431,7 +438,8 @@ input[type='date'] {
 
 /* Chrome/Android renders this icon oversized relative to the field by
    default — pin it to a sane, consistent size */
-input[type='date']::-webkit-calendar-picker-indicator {
+input[type='date']::-webkit-calendar-picker-indicator,
+input[type='month']::-webkit-calendar-picker-indicator {
   width: 18px;
   height: 18px;
   padding: 0;
@@ -441,11 +449,13 @@ input[type='date']::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
-input[type='date']::-webkit-calendar-picker-indicator:hover {
+input[type='date']::-webkit-calendar-picker-indicator:hover,
+input[type='month']::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
 }
 
-input[type='date']::-webkit-datetime-edit {
+input[type='date']::-webkit-datetime-edit,
+input[type='month']::-webkit-datetime-edit {
   font-size: var(--control-font);
 }
 

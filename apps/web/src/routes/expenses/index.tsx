@@ -1,7 +1,13 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { requireUser } from '../../lib/auth'
-import { getExpensesSummary, listCategories, listExpenses, listUsers } from '../../lib/expenses'
+import {
+  getExpensesSummary,
+  listCategories,
+  listExpenses,
+  listPayPeriods,
+  listUsers,
+} from '../../lib/expenses'
 import type { Category, Expense, UserSummary } from '../../lib/expenses'
 
 type ExpensesSearch = {
@@ -10,6 +16,7 @@ type ExpensesSearch = {
   user_id?: number
   category_id?: number
   q?: string
+  pay_period?: string
   sort?: 'asc' | 'desc'
   page?: number
 }
@@ -34,6 +41,12 @@ function formatDate(iso: string) {
   return `${day} ${MONTHS[Number(month) - 1]?.slice(0, 3)} ${year}`
 }
 
+function formatPeriod(period: string) {
+  const [year, month] = period.split('-')
+  const name = MONTHS[Number(month) - 1]
+  return name ? `${name} ${year}` : period
+}
+
 export const Route = createFileRoute('/expenses/')({
   validateSearch: (search: Record<string, unknown>): ExpensesSearch => ({
     year: search.year ? Number(search.year) : undefined,
@@ -41,6 +54,7 @@ export const Route = createFileRoute('/expenses/')({
     user_id: search.user_id ? Number(search.user_id) : undefined,
     category_id: search.category_id ? Number(search.category_id) : undefined,
     q: search.q ? String(search.q) : undefined,
+    pay_period: search.pay_period ? String(search.pay_period) : undefined,
     sort: search.sort === 'asc' ? 'asc' : 'desc',
     page: search.page ? Number(search.page) : 1,
   }),
@@ -49,22 +63,29 @@ export const Route = createFileRoute('/expenses/')({
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const [expenses, categories, users, summary] = await Promise.all([
+    const [expenses, categories, users, summary, payPeriods] = await Promise.all([
       listExpenses({ data: deps }),
       listCategories(),
       listUsers(),
       getExpensesSummary({
-        data: { year: deps.year, month: deps.month, category_id: deps.category_id, q: deps.q },
+        data: {
+          year: deps.year,
+          month: deps.month,
+          category_id: deps.category_id,
+          q: deps.q,
+          pay_period: deps.pay_period,
+        },
       }),
+      listPayPeriods(),
     ])
-    return { expenses, categories, users, summary }
+    return { expenses, categories, users, summary, payPeriods }
   },
   component: ExpensesPage,
 })
 
 function ExpensesPage() {
   const search = Route.useSearch()
-  const { expenses, categories, users, summary } = Route.useLoaderData()
+  const { expenses, categories, users, summary, payPeriods } = Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
   const [searchInput, setSearchInput] = useState(search.q ?? '')
   const activeFilterCount = [
@@ -73,6 +94,7 @@ function ExpensesPage() {
     search.user_id,
     search.category_id,
     search.q,
+    search.pay_period,
   ].filter((v) => v !== undefined && v !== '').length
   const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0)
 
@@ -229,6 +251,21 @@ function ExpensesPage() {
                 ))}
               </select>
             </div>
+            <div className="field">
+              <label htmlFor="f-period">Periode Gajian</label>
+              <select
+                id="f-period"
+                value={search.pay_period ?? ''}
+                onChange={(e) => updateFilter({ pay_period: e.target.value || undefined })}
+              >
+                <option value="">Semua periode</option>
+                {payPeriods.map((p: string) => (
+                  <option key={p} value={p}>
+                    {formatPeriod(p)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
       </div>
@@ -252,6 +289,7 @@ function ExpensesPage() {
                     <th className="sortable" onClick={toggleSort}>
                       Tanggal {search.sort === 'asc' ? '↑' : '↓'}
                     </th>
+                    <th>Periode</th>
                     <th>Kategori</th>
                     <th>Untuk</th>
                     <th className="amount">Nominal</th>
@@ -269,6 +307,7 @@ function ExpensesPage() {
                       }
                     >
                       <td>{formatDate(e.expense_date)}</td>
+                      <td>{e.pay_period ? formatPeriod(e.pay_period) : <span className="muted">—</span>}</td>
                       <td>{categoryById.get(e.category_id) ?? '-'}</td>
                       <td>{e.detail}</td>
                       <td className="amount">{formatRupiah(e.amount)}</td>

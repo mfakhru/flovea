@@ -14,6 +14,7 @@ export type Expense = {
   notes: string | null
   needs_reimburse: boolean
   reimbursed_at: string | null
+  pay_period: string | null
   created_at: string
 }
 
@@ -23,6 +24,7 @@ export type ExpenseFilters = {
   user_id?: number
   category_id?: number
   q?: string
+  pay_period?: string
   sort?: 'asc' | 'desc'
   page?: number
 }
@@ -34,6 +36,7 @@ export type ExpenseInput = {
   amount: number
   notes?: string | null
   needs_reimburse?: boolean
+  pay_period?: string | null
 }
 
 export type ImportResult = {
@@ -43,10 +46,20 @@ export type ImportResult = {
 
 export type UserTotal = { user_id: number; display_name: string; total: number }
 export type ExpenseSummary = { by_user: UserTotal[]; pending_reimburse: number }
-export type SummaryFilters = { year?: number; month?: number; category_id?: number; q?: string }
+export type SummaryFilters = {
+  year?: number
+  month?: number
+  category_id?: number
+  q?: string
+  pay_period?: string
+}
 
 export const listCategories = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Category[]> => apiJson<Category[]>('/categories'),
+)
+
+export const listPayPeriods = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<string[]> => apiJson<string[]>('/expenses/pay-periods'),
 )
 
 export const listUsers = createServerFn({ method: 'GET' }).handler(
@@ -73,6 +86,7 @@ export const listExpenses = createServerFn({ method: 'GET' })
     if (data.user_id) params.set('user_id', String(data.user_id))
     if (data.category_id) params.set('category_id', String(data.category_id))
     if (data.q) params.set('q', data.q)
+    if (data.pay_period) params.set('pay_period', data.pay_period)
     if (data.sort) params.set('sort', data.sort)
     if (data.page) params.set('page', String(data.page))
     return apiJson<Expense[]>(`/expenses?${params.toString()}`)
@@ -86,6 +100,7 @@ export const getExpensesSummary = createServerFn({ method: 'GET' })
     if (data.month) params.set('month', String(data.month))
     if (data.category_id) params.set('category_id', String(data.category_id))
     if (data.q) params.set('q', data.q)
+    if (data.pay_period) params.set('pay_period', data.pay_period)
     return apiJson<ExpenseSummary>(`/expenses/summary?${params.toString()}`)
   })
 

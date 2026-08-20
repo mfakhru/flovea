@@ -16,6 +16,10 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function currentPeriod() {
+  return new Date().toISOString().slice(0, 7)
+}
+
 function formatThousands(digits: string) {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
@@ -32,6 +36,7 @@ function NewExpensePage() {
   const [detail, setDetail] = useState('')
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
+  const [payPeriod, setPayPeriod] = useState(currentPeriod())
   const [needsReimburse, setNeedsReimburse] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -76,6 +81,7 @@ function NewExpensePage() {
           amount: amountNumber,
           notes: notes || null,
           needs_reimburse: needsReimburse,
+          pay_period: payPeriod || null,
         },
       })
       await router.invalidate()
@@ -162,6 +168,19 @@ function NewExpensePage() {
             placeholder="0"
             required
           />
+        </div>
+
+        <div className="field">
+          <label htmlFor="pay-period">Periode Gajian</label>
+          <input
+            id="pay-period"
+            type="month"
+            value={payPeriod}
+            onChange={(e) => setPayPeriod(e.target.value)}
+          />
+          <p className="field-hint">
+            Sesuaikan kalau tanggal ini masih bagian dari gajian bulan sebelum/sesudahnya.
+          </p>
         </div>
 
         <div className="field">

@@ -31,6 +31,7 @@ def _build_filters(
     month: int | None,
     category_id: int | None,
     q: str | None,
+    pay_period: str | None = None,
 ) -> tuple[list[str], list]:
     clauses: list[str] = []
     params: list = []
@@ -47,6 +48,9 @@ def _build_filters(
         clauses.append("(detail LIKE ? OR notes LIKE ?)")
         like = f"%{q}%"
         params.extend([like, like])
+    if pay_period:
+        clauses.append("pay_period = ?")
+        params.append(pay_period)
 
     return clauses, params
 
@@ -59,12 +63,13 @@ async def list_expenses(
     user_id: int | None = None,
     category_id: int | None = None,
     q: str | None = None,
+    pay_period: str | None = None,
     sort: str = "desc",
     page: int = 1,
     user: dict = Depends(get_current_user),
 ):
     env = request.scope["env"]
-    clauses, params = _build_filters(year, month, category_id, q)
+    clauses, params = _build_filters(year, month, category_id, q, pay_period)
     if user_id is not None:
         clauses.append("user_id = ?")
         params.append(user_id)
@@ -86,10 +91,11 @@ async def get_expenses_summary(
     month: int | None = None,
     category_id: int | None = None,
     q: str | None = None,
+    pay_period: str | None = None,
     user: dict = Depends(get_current_user),
 ):
     env = request.scope["env"]
-    clauses, params = _build_filters(year, month, category_id, q)
+    clauses, params = _build_filters(year, month, category_id, q, pay_period)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
     users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY id")
@@ -118,6 +124,16 @@ async def get_expenses_summary(
     }
 
 
+@router.get("/expenses/pay-periods", response_model=list[str])
+async def list_pay_periods(request: Request, user: dict = Depends(get_current_user)):
+    env = request.scope["env"]
+    rows = await fetch_all(
+        env.DB,
+        "SELECT DISTINCT pay_period FROM expenses WHERE pay_period IS NOT NULL ORDER BY pay_period DESC",
+    )
+    return [row["pay_period"] for row in rows]
+
+
 @router.get("/expenses/{expense_id}", response_model=ExpenseOut)
 async def get_expense(expense_id: int, request: Request, user: dict = Depends(get_current_user)):
     env = request.scope["env"]
@@ -135,8 +151,8 @@ async def create_expense(body: ExpenseCreate, request: Request, user: dict = Dep
 
     meta = await execute(
         env.DB,
-        "INSERT INTO expenses (user_id, category_id, expense_date, detail, amount, notes, needs_reimburse) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO expenses (user_id, category_id, expense_date, detail, amount, notes, needs_reimburse, pay_period) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         user["sub"],
         body.category_id,
         body.expense_date,
@@ -144,6 +160,7 @@ async def create_expense(body: ExpenseCreate, request: Request, user: dict = Dep
         body.amount,
         body.notes,
         int(body.needs_reimburse),
+        body.pay_period,
     )
     return await fetch_one(env.DB, "SELECT * FROM expenses WHERE id = ?", meta["last_row_id"])
 
@@ -167,7 +184,7 @@ async def update_expense(
     await execute(
         env.DB,
         "UPDATE expenses SET category_id = ?, expense_date = ?, detail = ?, amount = ?, notes = ?, "
-        "needs_reimburse = ?, reimbursed_at = ? WHERE id = ?",
+        "needs_reimburse = ?, reimbursed_at = ?, pay_period = ? WHERE id = ?",
         body.category_id,
         body.expense_date,
         body.detail,
@@ -175,6 +192,7 @@ async def update_expense(
         body.notes,
         int(body.needs_reimburse),
         reimbursed_at,
+        body.pay_period,
         expense_id,
     )
     return await fetch_one(env.DB, "SELECT * FROM expenses WHERE id = ?", expense_id)

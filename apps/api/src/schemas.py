@@ -34,6 +34,7 @@ class ExpenseCreate(BaseModel):
     amount: int  # IDR, whole rupiah, no decimals
     notes: str | None = None
     needs_reimburse: bool = False
+    pay_period: str | None = None  # YYYY-MM, the salary period this expense belongs to
 
 
 class ExpenseOut(BaseModel):
@@ -46,6 +47,7 @@ class ExpenseOut(BaseModel):
     notes: str | None = None
     needs_reimburse: bool
     reimbursed_at: str | None = None
+    pay_period: str | None = None
     created_at: str
 
 

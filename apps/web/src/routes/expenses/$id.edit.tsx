@@ -42,6 +42,7 @@ function EditExpensePage() {
   const [detail, setDetail] = useState(expense.detail)
   const [amount, setAmount] = useState(formatThousands(String(expense.amount)))
   const [notes, setNotes] = useState(expense.notes ?? '')
+  const [payPeriod, setPayPeriod] = useState(expense.pay_period ?? '')
   const [needsReimburse, setNeedsReimburse] = useState(expense.needs_reimburse)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -71,6 +72,7 @@ function EditExpensePage() {
           amount: amountNumber,
           notes: notes || null,
           needs_reimburse: needsReimburse,
+          pay_period: payPeriod || null,
         },
       })
       await router.invalidate()
@@ -161,6 +163,16 @@ function EditExpensePage() {
             value={amount}
             onChange={handleAmountChange}
             required
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="pay-period">Periode Gajian</label>
+          <input
+            id="pay-period"
+            type="month"
+            value={payPeriod}
+            onChange={(e) => setPayPeriod(e.target.value)}
           />
         </div>
 

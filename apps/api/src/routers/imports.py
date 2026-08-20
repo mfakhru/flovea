@@ -43,14 +43,15 @@ async def import_csv(file: UploadFile, request: Request, user: dict = Depends(ge
             amount = int(row["amount"])
             await execute(
                 env.DB,
-                "INSERT INTO expenses (user_id, category_id, expense_date, detail, amount, notes) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO expenses (user_id, category_id, expense_date, detail, amount, notes, pay_period) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 users[username],
                 categories[category_name],
                 row["date"],
                 row["detail"],
                 amount,
                 (row.get("notes") or None),
+                (row.get("pay_period") or None),
             )
             inserted += 1
         except Exception as exc:

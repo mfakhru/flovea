@@ -50,7 +50,8 @@ function ImportPage() {
         <div className="info-box">
           <strong>Format kolom:</strong> <code>date</code> (YYYY-MM-DD), <code>category</code>,{' '}
           <code>detail</code>, <code>amount</code>, <code>notes</code> (opsional), <code>user</code>{' '}
-          (username terdaftar). Kategori baru dibuat otomatis; username tak dikenal ditolak per baris.
+          (username terdaftar), <code>pay_period</code> (opsional, format YYYY-MM). Kategori baru dibuat
+          otomatis; username tak dikenal ditolak per baris.
         </div>
 
         <div className="field">
