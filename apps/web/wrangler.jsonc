@@ -14,6 +14,9 @@
 		"enabled": true
 	},
 	"upload_source_maps": true,
+	"routes": [
+		{ "pattern": "flo.niati.my.id", "custom_domain": true }
+	],
 	"services": [
 		{ "binding": "API", "service": "flovea-api" }
 	]
