@@ -294,7 +294,9 @@ function ExpensesPage() {
                           <span
                             className={e.reimbursed_at ? 'badge badge-paid' : 'badge badge-pending'}
                           >
-                            {e.reimbursed_at ? 'Lunas' : 'Belum'}
+                            {e.reimbursed_at
+                              ? `Lunas${e.reimbursed_by ? ` · ${userById.get(e.reimbursed_by) ?? '-'}` : ''}`
+                              : 'Belum'}
                           </span>
                         ) : (
                           <span className="muted">—</span>

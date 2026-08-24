@@ -195,7 +195,13 @@ function EditExpensePage() {
         {expense.needs_reimburse && (
           <div className="reimburse-box">
             <span className={expense.reimbursed_at ? 'badge badge-paid' : 'badge badge-pending'}>
-              {expense.reimbursed_at ? `Lunas · ${expense.reimbursed_at.slice(0, 10)}` : 'Belum dibayar'}
+              {expense.reimbursed_at
+                ? `Lunas · ${expense.reimbursed_at.slice(0, 10)}${
+                    expense.reimbursed_by
+                      ? ` oleh ${users.find((u) => u.id === expense.reimbursed_by)?.display_name ?? '-'}`
+                      : ''
+                  }`
+                : 'Belum dibayar'}
             </span>
             <button
               type="button"

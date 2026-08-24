@@ -14,6 +14,7 @@ export type Expense = {
   notes: string | null
   needs_reimburse: boolean
   reimbursed_at: string | null
+  reimbursed_by: number | null
   pay_period: string | null
   created_at: string
 }

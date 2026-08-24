@@ -99,9 +99,13 @@ async def get_expenses_summary(
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
     users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY id")
+    # Once reimbursed, the amount is attributed to whoever paid it back
+    # (reimbursed_by), not the original recorder (user_id) — that's who it
+    # actually ended up costing.
     totals_rows = await fetch_all(
         env.DB,
-        f"SELECT user_id, COALESCE(SUM(amount), 0) AS total FROM expenses {where} GROUP BY user_id",
+        f"SELECT COALESCE(reimbursed_by, user_id) AS user_id, COALESCE(SUM(amount), 0) AS total "
+        f"FROM expenses {where} GROUP BY COALESCE(reimbursed_by, user_id)",
         *params,
     )
     totals_by_user = {row["user_id"]: row["total"] for row in totals_rows}
@@ -162,8 +166,9 @@ async def get_expenses_by_period(
     users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY id")
     rows = await fetch_all(
         env.DB,
-        "SELECT pay_period, user_id, COALESCE(SUM(amount), 0) AS total FROM expenses "
-        "WHERE pay_period IS NOT NULL GROUP BY pay_period, user_id",
+        "SELECT pay_period, COALESCE(reimbursed_by, user_id) AS user_id, "
+        "COALESCE(SUM(amount), 0) AS total FROM expenses "
+        "WHERE pay_period IS NOT NULL GROUP BY pay_period, COALESCE(reimbursed_by, user_id)",
     )
 
     totals_by_period: dict[str, dict[int, int]] = {}
@@ -241,10 +246,11 @@ async def update_expense(
 
     # if reimbursement is no longer needed, any prior "paid" mark is stale — clear it
     reimbursed_at = existing["reimbursed_at"] if body.needs_reimburse else None
+    reimbursed_by = existing["reimbursed_by"] if body.needs_reimburse else None
     await execute(
         env.DB,
         "UPDATE expenses SET category_id = ?, expense_date = ?, detail = ?, amount = ?, notes = ?, "
-        "needs_reimburse = ?, reimbursed_at = ?, pay_period = ? WHERE id = ?",
+        "needs_reimburse = ?, reimbursed_at = ?, reimbursed_by = ?, pay_period = ? WHERE id = ?",
         body.category_id,
         body.expense_date,
         body.detail,
@@ -252,6 +258,7 @@ async def update_expense(
         body.notes,
         int(body.needs_reimburse),
         reimbursed_at,
+        reimbursed_by,
         body.pay_period,
         expense_id,
     )
@@ -269,8 +276,11 @@ async def toggle_reimburse(expense_id: int, request: Request, user: dict = Depen
 
     await execute(
         env.DB,
-        "UPDATE expenses SET reimbursed_at = CASE WHEN reimbursed_at IS NULL "
-        "THEN datetime('now') ELSE NULL END WHERE id = ?",
+        "UPDATE expenses SET "
+        "reimbursed_at = CASE WHEN reimbursed_at IS NULL THEN datetime('now') ELSE NULL END, "
+        "reimbursed_by = CASE WHEN reimbursed_at IS NULL THEN ? ELSE NULL END "
+        "WHERE id = ?",
+        user["sub"],
         expense_id,
     )
     return await fetch_one(env.DB, "SELECT * FROM expenses WHERE id = ?", expense_id)

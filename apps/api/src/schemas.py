@@ -47,6 +47,7 @@ class ExpenseOut(BaseModel):
     notes: str | None = None
     needs_reimburse: bool
     reimbursed_at: str | None = None
+    reimbursed_by: int | None = None
     pay_period: str | None = None
     created_at: str
 
