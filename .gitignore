@@ -1,6 +1,9 @@
 node_modules/
 .venv/
+.venv-workers/
 .wrangler/
+apps/api/python_modules/
+apps/api/pylock.toml
 .dev.vars
 .dev.vars.*
 __pycache__/
