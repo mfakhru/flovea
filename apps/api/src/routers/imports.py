@@ -16,7 +16,14 @@ REQUIRED_COLUMNS = {"date", "category", "detail", "amount", "notes", "user"}
 async def import_csv(file: UploadFile, request: Request, user: dict = Depends(get_current_user)):
     env = request.scope["env"]
     raw = (await file.read()).decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(raw))
+
+    try:
+        dialect = csv.Sniffer().sniff(raw[:4096], delimiters=",;\t")
+        delimiter = dialect.delimiter
+    except csv.Error:
+        delimiter = ","
+
+    reader = csv.DictReader(io.StringIO(raw), delimiter=delimiter)
 
     if reader.fieldnames is None or not REQUIRED_COLUMNS.issubset(set(reader.fieldnames)):
         raise HTTPException(
