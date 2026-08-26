@@ -77,6 +77,12 @@ export const listPayPeriods = createServerFn({ method: 'GET' }).handler(
   async (): Promise<string[]> => apiJson<string[]>('/expenses/pay-periods'),
 )
 
+/** Newest month (YYYY-MM) that holds an expense — Riwayat's default scope. */
+export const getLatestMonth = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<{ month: string | null }> =>
+    apiJson<{ month: string | null }>('/expenses/latest-month'),
+)
+
 export const listUsers = createServerFn({ method: 'GET' }).handler(
   async (): Promise<UserSummary[]> => apiJson<UserSummary[]>('/users'),
 )

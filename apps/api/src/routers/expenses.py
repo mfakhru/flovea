@@ -3,7 +3,15 @@ from math import ceil
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from db import execute, fetch_all, fetch_one
-from schemas import CategoryTotal, ExpenseCreate, ExpenseOut, ExpensePage, ExpenseSummary, PeriodTotal
+from schemas import (
+    CategoryTotal,
+    ExpenseCreate,
+    ExpenseOut,
+    ExpensePage,
+    ExpenseSummary,
+    LatestMonth,
+    PeriodTotal,
+)
 from security import get_current_user
 
 router = APIRouter()
@@ -242,6 +250,19 @@ async def list_pay_periods(request: Request, user: dict = Depends(get_current_us
         "SELECT DISTINCT pay_period FROM expenses WHERE pay_period IS NOT NULL ORDER BY pay_period DESC",
     )
     return [row["pay_period"] for row in rows]
+
+
+@router.get("/expenses/latest-month", response_model=LatestMonth)
+async def get_latest_month(request: Request, user: dict = Depends(get_current_user)):
+    """Newest month that actually holds an expense.
+
+    Riwayat scopes its default view to this rather than the running calendar
+    month, which is often still empty and would make the page look broken.
+    """
+    env = request.scope["env"]
+    row = await fetch_one(env.DB, "SELECT MAX(expense_date) AS latest FROM expenses")
+    latest = row["latest"] if row else None
+    return {"month": latest[:7] if latest else None}
 
 
 @router.get("/expenses/{expense_id}", response_model=ExpenseOut)

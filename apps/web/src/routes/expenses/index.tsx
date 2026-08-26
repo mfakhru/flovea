@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { requireUser } from '../../lib/auth'
 import {
   getExpensesSummary,
+  getLatestMonth,
   listCategories,
   listExpenses,
   listPayPeriods,
@@ -36,15 +37,20 @@ export const Route = createFileRoute('/expenses/')({
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    // The calendar month is a default scope, not a filter the user picks:
-    // it keeps a plain visit from scanning the whole table. A pay period or
-    // a text search is its own scope, so the month default steps aside
-    // there — otherwise picking an older pay period would query the
-    // intersection of both and always come back empty.
-    const now = new Date()
-    const monthScoped = !deps.all && !deps.pay_period && !deps.q
-    const year = monthScoped ? now.getFullYear() : undefined
-    const month = monthScoped ? now.getMonth() + 1 : undefined
+    // The month scope is a default view, not a filter the user picks: it
+    // keeps a plain visit from scanning the whole table. Any filter the
+    // user actually applies searches all of history instead — a filter
+    // that silently only looked at one month would hide most matches.
+    const filtered = Boolean(deps.pay_period || deps.q || deps.user_id || deps.category_id)
+    const monthScoped = !deps.all && !filtered
+
+    // Scope to the newest month that holds data rather than the running
+    // calendar month, which is regularly still empty and would leave the
+    // page looking broken.
+    const latest = monthScoped ? await getLatestMonth() : { month: null }
+    const [latestYear, latestMonth] = latest.month ? latest.month.split('-').map(Number) : []
+    const year = monthScoped ? latestYear : undefined
+    const month = monthScoped ? latestMonth : undefined
 
     const [expensesPage, categories, users, summary, payPeriods] = await Promise.all([
       listExpenses({ data: { ...deps, year, month } }),
@@ -61,17 +67,16 @@ export const Route = createFileRoute('/expenses/')({
       }),
       listPayPeriods(),
     ])
-    const periodLabel = monthScoped
-      ? formatPeriod(`${year}-${String(month).padStart(2, '0')}`)
-      : null
-    return { expensesPage, categories, users, summary, payPeriods, periodLabel }
+    const periodLabel = monthScoped && latest.month ? formatPeriod(latest.month) : null
+    return { expensesPage, categories, users, summary, payPeriods, periodLabel, filtered }
   },
   component: ExpensesPage,
 })
 
 function ExpensesPage() {
   const search = Route.useSearch()
-  const { expensesPage, categories, users, summary, payPeriods, periodLabel } = Route.useLoaderData()
+  const { expensesPage, categories, users, summary, payPeriods, periodLabel, filtered } =
+    Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
   const [searchInput, setSearchInput] = useState(search.q ?? '')
   // `all` isn't counted — the scope line above the cards already says
@@ -123,13 +128,14 @@ function ExpensesPage() {
 
       {periodLabel && (
         <p className="table-hint">
-          Menampilkan riwayat {periodLabel}.{' '}
+          Menampilkan riwayat {periodLabel} (bulan terakhir yang ada datanya).{' '}
           <button type="button" className="secondary btn-sm" onClick={() => updateFilter({ all: true })}>
             Tampilkan semua riwayat
           </button>
         </p>
       )}
-      {search.all && (
+      {filtered && <p className="table-hint">Filter aktif — dicari di semua riwayat.</p>}
+      {search.all && !filtered && (
         <p className="table-hint">
           Menampilkan semua riwayat.{' '}
           <button
@@ -137,7 +143,7 @@ function ExpensesPage() {
             className="secondary btn-sm"
             onClick={() => updateFilter({ all: undefined })}
           >
-            Kembali ke bulan ini
+            Kembali ke bulan terakhir
           </button>
         </p>
       )}
