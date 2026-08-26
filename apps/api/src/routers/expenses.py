@@ -18,7 +18,6 @@ SUAMI_DISPLAY_NAME = "Suami"
 # that gets its own bucket in totals instead of being attributed to either
 # user — this overrides the usual reimburse attribution too.
 SPECIAL_CASE_PREFIX = "A_"
-IS_SPECIAL_CASE_CLAUSE = "substr(detail, 1, 2) = ?"
 NOT_SPECIAL_CASE_CLAUSE = "substr(detail, 1, 2) != ?"
 
 
@@ -87,15 +86,21 @@ async def list_expenses(
     order = "ASC" if sort == "asc" else "DESC"
     offset = max(page - 1, 0) * PAGE_SIZE
 
-    count_row = await fetch_one(env.DB, f"SELECT COUNT(*) AS total FROM expenses {where}", *params)
-    total = count_row["total"] if count_row else 0
-    total_pages = max(1, ceil(total / PAGE_SIZE))
-
+    # A window-function count rides along with the page query in a single
+    # D1 round-trip; only fall back to a separate COUNT(*) for the (rare)
+    # case where the requested page itself came back empty.
     sql = (
-        f"SELECT * FROM expenses {where} "
+        f"SELECT *, COUNT(*) OVER() AS total_count FROM expenses {where} "
         f"ORDER BY expense_date {order}, id {order} LIMIT ? OFFSET ?"
     )
     items = await fetch_all(env.DB, sql, *params, PAGE_SIZE, offset)
+    if items:
+        total = items[0]["total_count"]
+    else:
+        count_row = await fetch_one(env.DB, f"SELECT COUNT(*) AS total FROM expenses {where}", *params)
+        total = count_row["total"] if count_row else 0
+    total_pages = max(1, ceil(total / PAGE_SIZE))
+
     return {"items": items, "page": page, "page_size": PAGE_SIZE, "total": total, "total_pages": total_pages}
 
 
@@ -116,37 +121,35 @@ async def get_expenses_summary(
     users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY id")
 
     # "A_"-prefixed expenses are a special case tracked in their own bucket,
-    # excluded from both users' totals regardless of owner/reimbursement.
-    non_special_clauses = [*clauses, NOT_SPECIAL_CASE_CLAUSE]
-    non_special_where = f"WHERE {' AND '.join(non_special_clauses)}"
-    non_special_params = [*params, SPECIAL_CASE_PREFIX]
-
-    # Once reimbursed, the amount is attributed to whoever paid it back
-    # (reimbursed_by), not the original recorder (user_id) — that's who it
-    # actually ended up costing.
+    # excluded from both users' totals regardless of owner/reimbursement. A
+    # single CASE-grouped query gets both the per-user and special-case
+    # totals in one round-trip instead of two separate queries.
+    # Once reimbursed, a non-special amount is attributed to whoever paid it
+    # back (reimbursed_by), not the original recorder (user_id) — that's who
+    # it actually ended up costing.
     totals_rows = await fetch_all(
         env.DB,
-        f"SELECT COALESCE(reimbursed_by, user_id) AS user_id, COALESCE(SUM(amount), 0) AS total "
-        f"FROM expenses {non_special_where} GROUP BY COALESCE(reimbursed_by, user_id)",
-        *non_special_params,
-    )
-    totals_by_user = {row["user_id"]: row["total"] for row in totals_rows}
-
-    special_case_clauses = [*clauses, IS_SPECIAL_CASE_CLAUSE]
-    special_case_where = f"WHERE {' AND '.join(special_case_clauses)}"
-    special_case_row = await fetch_one(
-        env.DB,
-        f"SELECT COALESCE(SUM(amount), 0) AS total FROM expenses {special_case_where}",
-        *params,
+        "SELECT CASE WHEN substr(detail, 1, 2) = ? THEN 'special' "
+        "ELSE CAST(COALESCE(reimbursed_by, user_id) AS TEXT) END AS bucket, "
+        f"COALESCE(SUM(amount), 0) AS total FROM expenses {where} GROUP BY bucket",
         SPECIAL_CASE_PREFIX,
+        *params,
     )
+    totals_by_user: dict[int, int] = {}
+    special_case_total = 0
+    for row in totals_rows:
+        if row["bucket"] == "special":
+            special_case_total = row["total"]
+        else:
+            totals_by_user[int(row["bucket"])] = row["total"]
 
-    pending_clauses = [*non_special_clauses, "needs_reimburse = 1", "reimbursed_at IS NULL"]
-    pending_where = f"WHERE {' AND '.join(pending_clauses)}"
+    non_special_clauses = [*clauses, NOT_SPECIAL_CASE_CLAUSE, "needs_reimburse = 1", "reimbursed_at IS NULL"]
+    pending_where = f"WHERE {' AND '.join(non_special_clauses)}"
     pending_row = await fetch_one(
         env.DB,
         f"SELECT COALESCE(SUM(amount), 0) AS total FROM expenses {pending_where}",
-        *non_special_params,
+        *params,
+        SPECIAL_CASE_PREFIX,
     )
 
     by_user = [
@@ -156,7 +159,7 @@ async def get_expenses_summary(
     return {
         "by_user": by_user,
         "pending_reimburse": pending_row["total"] if pending_row else 0,
-        "special_case_total": special_case_row["total"] if special_case_row else 0,
+        "special_case_total": special_case_total,
     }
 
 
