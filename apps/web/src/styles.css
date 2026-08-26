@@ -358,6 +358,30 @@ main.page {
   margin-bottom: 1.125rem;
 }
 
+/* card header that carries a control next to the title */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.125rem;
+}
+
+.card-head .card-title {
+  margin-bottom: 0;
+}
+
+.segmented {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.segmented .is-active {
+  pointer-events: none;
+}
+
 .bar-list {
   display: flex;
   flex-direction: column;

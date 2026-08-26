@@ -202,20 +202,23 @@ async def get_expenses_by_category(
 
 @router.get("/expenses/by-period", response_model=list[PeriodTotal])
 async def get_expenses_by_period(
-    request: Request, limit: int = 12, user: dict = Depends(get_current_user)
+    request: Request, limit: int = 12, group: str = "month", user: dict = Depends(get_current_user)
 ):
     env = request.scope["env"]
     users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY id")
+    # group="year" rolls the YYYY-MM pay periods up to the calendar year, so
+    # the returned "pay_period" is just "YYYY" in that mode.
+    period_expr = "substr(pay_period, 1, 4)" if group == "year" else "pay_period"
     rows = await fetch_all(
         env.DB,
-        "SELECT pay_period, COALESCE(reimbursed_by, user_id) AS user_id, "
+        f"SELECT {period_expr} AS period, COALESCE(reimbursed_by, user_id) AS user_id, "
         "COALESCE(SUM(amount), 0) AS total FROM expenses "
-        "WHERE pay_period IS NOT NULL GROUP BY pay_period, COALESCE(reimbursed_by, user_id)",
+        "WHERE pay_period IS NOT NULL GROUP BY period, COALESCE(reimbursed_by, user_id)",
     )
 
     totals_by_period: dict[str, dict[int, int]] = {}
     for row in rows:
-        totals_by_period.setdefault(row["pay_period"], {})[row["user_id"]] = row["total"]
+        totals_by_period.setdefault(row["period"], {})[row["user_id"]] = row["total"]
 
     periods = sorted(totals_by_period.keys(), reverse=True)[:limit]
     periods.reverse()

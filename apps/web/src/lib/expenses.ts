@@ -131,10 +131,11 @@ export const getExpensesByCategory = createServerFn({ method: 'GET' })
   })
 
 export const getExpensesByPeriod = createServerFn({ method: 'GET' })
-  .validator((data: { limit?: number }) => data)
+  .validator((data: { limit?: number; group?: 'month' | 'year' }) => data)
   .handler(async ({ data }): Promise<PeriodTotal[]> => {
     const params = new URLSearchParams()
     if (data.limit) params.set('limit', String(data.limit))
+    if (data.group) params.set('group', data.group)
     return apiJson<PeriodTotal[]>(`/expenses/by-period?${params.toString()}`)
   })
 

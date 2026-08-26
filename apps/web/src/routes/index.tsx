@@ -11,11 +11,13 @@ import { formatPeriod, formatRupiah } from '../lib/format'
 
 type HomeSearch = {
   period?: string
+  trend?: 'year'
 }
 
 export const Route = createFileRoute('/')({
   validateSearch: (search: Record<string, unknown>): HomeSearch => ({
     period: search.period ? String(search.period) : undefined,
+    trend: search.trend === 'year' ? 'year' : undefined,
   }),
   beforeLoad: async () => {
     await requireUser()
@@ -24,20 +26,23 @@ export const Route = createFileRoute('/')({
   loader: async ({ deps }) => {
     const payPeriods = await listPayPeriods()
     const activePeriod = deps.period ?? payPeriods[0]
+    const byYear = deps.trend === 'year'
 
     const [summary, byCategory, byPeriod] = await Promise.all([
       getExpensesSummary({ data: { pay_period: activePeriod } }),
       getExpensesByCategory({ data: { pay_period: activePeriod } }),
-      getExpensesByPeriod({ data: { limit: 12 } }),
+      // 12 keeps the monthly view readable on a phone; the yearly roll-up
+      // is only a handful of bars, so it can show every year on record.
+      getExpensesByPeriod({ data: { limit: byYear ? 20 : 12, group: byYear ? 'year' : 'month' } }),
     ])
-    return { payPeriods, activePeriod, summary, byCategory, byPeriod }
+    return { payPeriods, activePeriod, summary, byCategory, byPeriod, byYear }
   },
   component: HomePage,
 })
 
 function HomePage() {
   const search = Route.useSearch()
-  const { payPeriods, activePeriod, summary, byCategory, byPeriod } = Route.useLoaderData()
+  const { payPeriods, activePeriod, summary, byCategory, byPeriod, byYear } = Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
 
   const suamiTotal = summary.by_user.find((u) => u.display_name === 'Suami')?.total ?? 0
@@ -117,7 +122,27 @@ function HomePage() {
         </div>
 
         <div className="card">
-          <h2 className="card-title">Tren per Periode Gajian</h2>
+          <div className="card-head">
+            <h2 className="card-title">
+              {byYear ? 'Tren per Tahun' : 'Tren per Periode Gajian'}
+            </h2>
+            <div className="segmented">
+              <button
+                type="button"
+                className={byYear ? 'secondary btn-sm' : 'btn-sm is-active'}
+                onClick={() => navigate({ search: (prev) => ({ ...prev, trend: undefined }) })}
+              >
+                12 Bulan Terakhir
+              </button>
+              <button
+                type="button"
+                className={byYear ? 'btn-sm is-active' : 'secondary btn-sm'}
+                onClick={() => navigate({ search: (prev) => ({ ...prev, trend: 'year' }) })}
+              >
+                Per Tahun
+              </button>
+            </div>
+          </div>
           {byPeriod.length === 0 ? (
             <p className="muted">Belum ada pengeluaran yang ditandai periode gajian.</p>
           ) : (
