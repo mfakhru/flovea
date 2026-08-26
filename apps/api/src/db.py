@@ -26,3 +26,8 @@ async def execute(db, sql, *params):
         stmt = stmt.bind(*params)
     result = await stmt.run()
     return result.meta
+
+
+async def batch(db, statements):
+    """Run multiple already-bound prepared statements in a single D1 round-trip."""
+    return await db.batch(statements)
