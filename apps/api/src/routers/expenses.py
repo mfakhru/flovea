@@ -14,11 +14,16 @@ PAGE_SIZE = 50
 # expenses owned by the "Suami" account may be flagged needs_reimburse.
 SUAMI_DISPLAY_NAME = "Suami"
 
-# A "Untuk" (detail) field prefixed with "A_" marks a special-case expense
-# that gets its own bucket in totals instead of being attributed to either
-# user — this overrides the usual reimburse attribution too.
+# An "A_" prefix marks a special-case expense that gets its own bucket in
+# totals instead of being attributed to either user — this overrides the
+# usual reimburse attribution too. In practice the marker is typed into
+# Keterangan (notes); Untuk (detail) is honoured as well so it works from
+# either field. Both placeholders below bind SPECIAL_CASE_PREFIX.
 SPECIAL_CASE_PREFIX = "A_"
-NOT_SPECIAL_CASE_CLAUSE = "substr(detail, 1, 2) != ?"
+IS_SPECIAL_CASE_SQL = (
+    "(substr(COALESCE(notes, ''), 1, 2) = ? OR substr(COALESCE(detail, ''), 1, 2) = ?)"
+)
+NOT_SPECIAL_CASE_CLAUSE = f"NOT {IS_SPECIAL_CASE_SQL}"
 
 
 def _date_range_clause(year: int | None, month: int | None) -> tuple[str, list] | None:
@@ -129,9 +134,10 @@ async def get_expenses_summary(
     # it actually ended up costing.
     totals_rows = await fetch_all(
         env.DB,
-        "SELECT CASE WHEN substr(detail, 1, 2) = ? THEN 'special' "
+        f"SELECT CASE WHEN {IS_SPECIAL_CASE_SQL} THEN 'special' "
         "ELSE CAST(COALESCE(reimbursed_by, user_id) AS TEXT) END AS bucket, "
         f"COALESCE(SUM(amount), 0) AS total FROM expenses {where} GROUP BY bucket",
+        SPECIAL_CASE_PREFIX,
         SPECIAL_CASE_PREFIX,
         *params,
     )
@@ -149,6 +155,7 @@ async def get_expenses_summary(
         env.DB,
         f"SELECT COALESCE(SUM(amount), 0) AS total FROM expenses {pending_where}",
         *params,
+        SPECIAL_CASE_PREFIX,
         SPECIAL_CASE_PREFIX,
     )
 

@@ -9,11 +9,9 @@ import {
   listUsers,
 } from '../../lib/expenses'
 import type { Category, UserSummary } from '../../lib/expenses'
-import { MONTHS, formatDate, formatPeriod, formatRupiah } from '../../lib/format'
+import { formatDate, formatPeriod, formatRupiah } from '../../lib/format'
 
 type ExpensesSearch = {
-  year?: number
-  month?: number
   user_id?: number
   category_id?: number
   q?: string
@@ -24,56 +22,38 @@ type ExpensesSearch = {
 }
 
 export const Route = createFileRoute('/expenses/')({
-  validateSearch: (search: Record<string, unknown>): ExpensesSearch => {
-    const all = search.all === true || search.all === 'true' ? true : undefined
-    const rawYear = search.year ? Number(search.year) : undefined
-    const rawMonth = search.month ? Number(search.month) : undefined
-    // Default to the current calendar month (written into the URL, same as
-    // sort/page below) so list/summary queries don't scan the whole table
-    // on every visit — "Tampilkan semua riwayat" opts back in via `all`.
-    // Writing a real year here (instead of defaulting only inside the
-    // loader) keeps the filter inputs and the actual query in sync —
-    // otherwise picking just "Bulan" alone (year field left blank) would
-    // silently drop the whole date filter and fall through to a full-table
-    // scan, since the API requires year to apply any date range at all.
-    // Year-only (month left at "Semua bulan") still filters the full year,
-    // same as before — month is only defaulted on a fully untouched visit.
-    const now = new Date()
-    let year = rawYear
-    let month = rawMonth
-    if (!all && year === undefined) {
-      year = now.getFullYear()
-      if (month === undefined) month = now.getMonth() + 1
-    }
-    if (all) {
-      year = undefined
-      month = undefined
-    }
-    return {
-      year,
-      month,
-      user_id: search.user_id ? Number(search.user_id) : undefined,
-      category_id: search.category_id ? Number(search.category_id) : undefined,
-      q: search.q ? String(search.q) : undefined,
-      pay_period: search.pay_period ? String(search.pay_period) : undefined,
-      sort: search.sort === 'asc' ? 'asc' : 'desc',
-      page: search.page ? Number(search.page) : 1,
-      all,
-    }
-  },
+  validateSearch: (search: Record<string, unknown>): ExpensesSearch => ({
+    user_id: search.user_id ? Number(search.user_id) : undefined,
+    category_id: search.category_id ? Number(search.category_id) : undefined,
+    q: search.q ? String(search.q) : undefined,
+    pay_period: search.pay_period ? String(search.pay_period) : undefined,
+    sort: search.sort === 'asc' ? 'asc' : 'desc',
+    page: search.page ? Number(search.page) : 1,
+    all: search.all === true || search.all === 'true' ? true : undefined,
+  }),
   beforeLoad: async () => {
     await requireUser()
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
+    // The calendar month is a default scope, not a filter the user picks:
+    // it keeps a plain visit from scanning the whole table. A pay period or
+    // a text search is its own scope, so the month default steps aside
+    // there — otherwise picking an older pay period would query the
+    // intersection of both and always come back empty.
+    const now = new Date()
+    const monthScoped = !deps.all && !deps.pay_period && !deps.q
+    const year = monthScoped ? now.getFullYear() : undefined
+    const month = monthScoped ? now.getMonth() + 1 : undefined
+
     const [expensesPage, categories, users, summary, payPeriods] = await Promise.all([
-      listExpenses({ data: deps }),
+      listExpenses({ data: { ...deps, year, month } }),
       listCategories(),
       listUsers(),
       getExpensesSummary({
         data: {
-          year: deps.year,
-          month: deps.month,
+          year,
+          month,
           category_id: deps.category_id,
           q: deps.q,
           pay_period: deps.pay_period,
@@ -81,8 +61,9 @@ export const Route = createFileRoute('/expenses/')({
       }),
       listPayPeriods(),
     ])
-    const periodLabel =
-      deps.year && deps.month ? formatPeriod(`${deps.year}-${String(deps.month).padStart(2, '0')}`) : null
+    const periodLabel = monthScoped
+      ? formatPeriod(`${year}-${String(month).padStart(2, '0')}`)
+      : null
     return { expensesPage, categories, users, summary, payPeriods, periodLabel }
   },
   component: ExpensesPage,
@@ -93,13 +74,14 @@ function ExpensesPage() {
   const { expensesPage, categories, users, summary, payPeriods, periodLabel } = Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
   const [searchInput, setSearchInput] = useState(search.q ?? '')
-  // year/month aren't counted here — they're always populated with a
-  // default (this month) unless "all" is on, so they aren't an extra
-  // filter the user consciously applied the way the others are.
-  const activeFilterCount =
-    [search.user_id, search.category_id, search.q, search.pay_period].filter(
-      (v) => v !== undefined && v !== '',
-    ).length + (search.all ? 1 : 0)
+  // `all` isn't counted — the scope line above the cards already says
+  // whether the whole history is showing, and offers the way back.
+  const activeFilterCount = [
+    search.user_id,
+    search.category_id,
+    search.q,
+    search.pay_period,
+  ].filter((v) => v !== undefined && v !== '').length
   const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0)
 
   // debounce the search box so typing doesn't fire a server function per keystroke
@@ -144,6 +126,18 @@ function ExpensesPage() {
           Menampilkan riwayat {periodLabel}.{' '}
           <button type="button" className="secondary btn-sm" onClick={() => updateFilter({ all: true })}>
             Tampilkan semua riwayat
+          </button>
+        </p>
+      )}
+      {search.all && (
+        <p className="table-hint">
+          Menampilkan semua riwayat.{' '}
+          <button
+            type="button"
+            className="secondary btn-sm"
+            onClick={() => updateFilter({ all: undefined })}
+          >
+            Kembali ke bulan ini
           </button>
         </p>
       )}
@@ -206,35 +200,6 @@ function ExpensesPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="f-year">Tahun</label>
-              <input
-                id="f-year"
-                type="number"
-                value={search.year ?? ''}
-                onChange={(e) =>
-                  updateFilter({ year: e.target.value ? Number(e.target.value) : undefined })
-                }
-                placeholder="2026"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="f-month">Bulan</label>
-              <select
-                id="f-month"
-                value={search.month ?? ''}
-                onChange={(e) =>
-                  updateFilter({ month: e.target.value ? Number(e.target.value) : undefined })
-                }
-              >
-                <option value="">Semua bulan</option>
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i + 1}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
               <label htmlFor="f-user">Orang</label>
               <select
                 id="f-user"
@@ -283,14 +248,6 @@ function ExpensesPage() {
                 ))}
               </select>
             </div>
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={search.all ?? false}
-                onChange={(e) => updateFilter({ all: e.target.checked || undefined })}
-              />
-              Tampilkan semua riwayat (semua waktu)
-            </label>
           </div>
         )}
       </div>
