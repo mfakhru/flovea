@@ -46,7 +46,18 @@ export type ImportResult = {
 }
 
 export type UserTotal = { user_id: number; display_name: string; total: number }
-export type ExpenseSummary = { by_user: UserTotal[]; pending_reimburse: number }
+export type ExpenseSummary = {
+  by_user: UserTotal[]
+  pending_reimburse: number
+  special_case_total: number
+}
+export type ExpensePage = {
+  items: Expense[]
+  page: number
+  page_size: number
+  total: number
+  total_pages: number
+}
 export type SummaryFilters = {
   year?: number
   month?: number
@@ -83,7 +94,7 @@ export const createCategory = createServerFn({ method: 'POST' })
 
 export const listExpenses = createServerFn({ method: 'GET' })
   .validator((filters: ExpenseFilters) => filters)
-  .handler(async ({ data }): Promise<Expense[]> => {
+  .handler(async ({ data }): Promise<ExpensePage> => {
     const params = new URLSearchParams()
     if (data.year) params.set('year', String(data.year))
     if (data.month) params.set('month', String(data.month))
@@ -93,7 +104,7 @@ export const listExpenses = createServerFn({ method: 'GET' })
     if (data.pay_period) params.set('pay_period', data.pay_period)
     if (data.sort) params.set('sort', data.sort)
     if (data.page) params.set('page', String(data.page))
-    return apiJson<Expense[]>(`/expenses?${params.toString()}`)
+    return apiJson<ExpensePage>(`/expenses?${params.toString()}`)
   })
 
 export const getExpensesSummary = createServerFn({ method: 'GET' })

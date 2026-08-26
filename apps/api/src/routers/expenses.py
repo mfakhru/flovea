@@ -1,7 +1,9 @@
+from math import ceil
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from db import execute, fetch_all, fetch_one
-from schemas import CategoryTotal, ExpenseCreate, ExpenseOut, ExpenseSummary, PeriodTotal
+from schemas import CategoryTotal, ExpenseCreate, ExpenseOut, ExpensePage, ExpenseSummary, PeriodTotal
 from security import get_current_user
 
 router = APIRouter()
@@ -11,6 +13,13 @@ PAGE_SIZE = 50
 # Reimbursement only flows one way: Suami pays, Istri reimburses. Only
 # expenses owned by the "Suami" account may be flagged needs_reimburse.
 SUAMI_DISPLAY_NAME = "Suami"
+
+# A "Untuk" (detail) field prefixed with "A_" marks a special-case expense
+# that gets its own bucket in totals instead of being attributed to either
+# user — this overrides the usual reimburse attribution too.
+SPECIAL_CASE_PREFIX = "A_"
+IS_SPECIAL_CASE_CLAUSE = "substr(detail, 1, 2) = ?"
+NOT_SPECIAL_CASE_CLAUSE = "substr(detail, 1, 2) != ?"
 
 
 def _date_range_clause(year: int | None, month: int | None) -> tuple[str, list] | None:
@@ -55,7 +64,7 @@ def _build_filters(
     return clauses, params
 
 
-@router.get("/expenses", response_model=list[ExpenseOut])
+@router.get("/expenses", response_model=ExpensePage)
 async def list_expenses(
     request: Request,
     year: int | None = None,
@@ -77,11 +86,17 @@ async def list_expenses(
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     order = "ASC" if sort == "asc" else "DESC"
     offset = max(page - 1, 0) * PAGE_SIZE
+
+    count_row = await fetch_one(env.DB, f"SELECT COUNT(*) AS total FROM expenses {where}", *params)
+    total = count_row["total"] if count_row else 0
+    total_pages = max(1, ceil(total / PAGE_SIZE))
+
     sql = (
         f"SELECT * FROM expenses {where} "
         f"ORDER BY expense_date {order}, id {order} LIMIT ? OFFSET ?"
     )
-    return await fetch_all(env.DB, sql, *params, PAGE_SIZE, offset)
+    items = await fetch_all(env.DB, sql, *params, PAGE_SIZE, offset)
+    return {"items": items, "page": page, "page_size": PAGE_SIZE, "total": total, "total_pages": total_pages}
 
 
 @router.get("/expenses/summary", response_model=ExpenseSummary)
@@ -99,23 +114,39 @@ async def get_expenses_summary(
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
     users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY id")
+
+    # "A_"-prefixed expenses are a special case tracked in their own bucket,
+    # excluded from both users' totals regardless of owner/reimbursement.
+    non_special_clauses = [*clauses, NOT_SPECIAL_CASE_CLAUSE]
+    non_special_where = f"WHERE {' AND '.join(non_special_clauses)}"
+    non_special_params = [*params, SPECIAL_CASE_PREFIX]
+
     # Once reimbursed, the amount is attributed to whoever paid it back
     # (reimbursed_by), not the original recorder (user_id) — that's who it
     # actually ended up costing.
     totals_rows = await fetch_all(
         env.DB,
         f"SELECT COALESCE(reimbursed_by, user_id) AS user_id, COALESCE(SUM(amount), 0) AS total "
-        f"FROM expenses {where} GROUP BY COALESCE(reimbursed_by, user_id)",
-        *params,
+        f"FROM expenses {non_special_where} GROUP BY COALESCE(reimbursed_by, user_id)",
+        *non_special_params,
     )
     totals_by_user = {row["user_id"]: row["total"] for row in totals_rows}
 
-    pending_clauses = [*clauses, "needs_reimburse = 1", "reimbursed_at IS NULL"]
+    special_case_clauses = [*clauses, IS_SPECIAL_CASE_CLAUSE]
+    special_case_where = f"WHERE {' AND '.join(special_case_clauses)}"
+    special_case_row = await fetch_one(
+        env.DB,
+        f"SELECT COALESCE(SUM(amount), 0) AS total FROM expenses {special_case_where}",
+        *params,
+        SPECIAL_CASE_PREFIX,
+    )
+
+    pending_clauses = [*non_special_clauses, "needs_reimburse = 1", "reimbursed_at IS NULL"]
     pending_where = f"WHERE {' AND '.join(pending_clauses)}"
     pending_row = await fetch_one(
         env.DB,
         f"SELECT COALESCE(SUM(amount), 0) AS total FROM expenses {pending_where}",
-        *params,
+        *non_special_params,
     )
 
     by_user = [
@@ -125,6 +156,7 @@ async def get_expenses_summary(
     return {
         "by_user": by_user,
         "pending_reimburse": pending_row["total"] if pending_row else 0,
+        "special_case_total": special_case_row["total"] if special_case_row else 0,
     }
 
 

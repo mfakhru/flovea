@@ -79,6 +79,10 @@ function HomePage() {
           <span className="stat-label">Total Istri</span>
           <span className="stat-value">{formatRupiah(istriTotal)}</span>
         </div>
+        <div className="stat-card">
+          <span className="stat-label">Total Special Case</span>
+          <span className="stat-value">{formatRupiah(summary.special_case_total)}</span>
+        </div>
         {summary.pending_reimburse > 0 && (
           <div className="stat-card stat-card-warn">
             <span className="stat-label">Perlu dibayarkan</span>

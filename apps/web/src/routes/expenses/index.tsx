@@ -8,7 +8,7 @@ import {
   listPayPeriods,
   listUsers,
 } from '../../lib/expenses'
-import type { Category, Expense, UserSummary } from '../../lib/expenses'
+import type { Category, UserSummary } from '../../lib/expenses'
 import { MONTHS, formatDate, formatPeriod, formatRupiah } from '../../lib/format'
 
 type ExpensesSearch = {
@@ -20,9 +20,8 @@ type ExpensesSearch = {
   pay_period?: string
   sort?: 'asc' | 'desc'
   page?: number
+  all?: boolean
 }
-
-const PAGE_SIZE = 50
 
 export const Route = createFileRoute('/expenses/')({
   validateSearch: (search: Record<string, unknown>): ExpensesSearch => ({
@@ -34,20 +33,28 @@ export const Route = createFileRoute('/expenses/')({
     pay_period: search.pay_period ? String(search.pay_period) : undefined,
     sort: search.sort === 'asc' ? 'asc' : 'desc',
     page: search.page ? Number(search.page) : 1,
+    all: search.all === true || search.all === 'true' ? true : undefined,
   }),
   beforeLoad: async () => {
     await requireUser()
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const [expenses, categories, users, summary, payPeriods] = await Promise.all([
-      listExpenses({ data: deps }),
+    // Default to the current calendar month so list/summary queries don't
+    // scan the whole table on every visit — "Semua riwayat" opts back in.
+    const now = new Date()
+    const usingDefaultPeriod = !deps.all && deps.year === undefined && deps.month === undefined
+    const year = usingDefaultPeriod ? now.getFullYear() : deps.year
+    const month = usingDefaultPeriod ? now.getMonth() + 1 : deps.month
+
+    const [expensesPage, categories, users, summary, payPeriods] = await Promise.all([
+      listExpenses({ data: { ...deps, year, month } }),
       listCategories(),
       listUsers(),
       getExpensesSummary({
         data: {
-          year: deps.year,
-          month: deps.month,
+          year,
+          month,
           category_id: deps.category_id,
           q: deps.q,
           pay_period: deps.pay_period,
@@ -55,24 +62,29 @@ export const Route = createFileRoute('/expenses/')({
       }),
       listPayPeriods(),
     ])
-    return { expenses, categories, users, summary, payPeriods }
+    const periodLabel = usingDefaultPeriod
+      ? formatPeriod(`${year}-${String(month).padStart(2, '0')}`)
+      : null
+    return { expensesPage, categories, users, summary, payPeriods, usingDefaultPeriod, periodLabel }
   },
   component: ExpensesPage,
 })
 
 function ExpensesPage() {
   const search = Route.useSearch()
-  const { expenses, categories, users, summary, payPeriods } = Route.useLoaderData()
+  const { expensesPage, categories, users, summary, payPeriods, usingDefaultPeriod, periodLabel } =
+    Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
   const [searchInput, setSearchInput] = useState(search.q ?? '')
-  const activeFilterCount = [
-    search.year,
-    search.month,
-    search.user_id,
-    search.category_id,
-    search.q,
-    search.pay_period,
-  ].filter((v) => v !== undefined && v !== '').length
+  const activeFilterCount =
+    [
+      search.year,
+      search.month,
+      search.user_id,
+      search.category_id,
+      search.q,
+      search.pay_period,
+    ].filter((v) => v !== undefined && v !== '').length + (search.all ? 1 : 0)
   const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0)
 
   // debounce the search box so typing doesn't fire a server function per keystroke
@@ -112,6 +124,15 @@ function ExpensesPage() {
         </Link>
       </div>
 
+      {usingDefaultPeriod && (
+        <p className="table-hint">
+          Menampilkan riwayat {periodLabel}.{' '}
+          <button type="button" className="secondary btn-sm" onClick={() => updateFilter({ all: true })}>
+            Tampilkan semua riwayat
+          </button>
+        </p>
+      )}
+
       <div className="stat-row">
         <div className="stat-card">
           <span className="stat-label">Total Suami</span>
@@ -120,6 +141,10 @@ function ExpensesPage() {
         <div className="stat-card">
           <span className="stat-label">Total Istri</span>
           <span className="stat-value">{formatRupiah(istriTotal)}</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Total Special Case</span>
+          <span className="stat-value">{formatRupiah(summary.special_case_total)}</span>
         </div>
         {summary.pending_reimburse > 0 && (
           <div className="stat-card stat-card-warn">
@@ -243,11 +268,19 @@ function ExpensesPage() {
                 ))}
               </select>
             </div>
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={search.all ?? false}
+                onChange={(e) => updateFilter({ all: e.target.checked || undefined })}
+              />
+              Tampilkan semua riwayat (semua waktu)
+            </label>
           </div>
         )}
       </div>
 
-      {expenses.length === 0 ? (
+      {expensesPage.items.length === 0 ? (
         <div className="card empty-state">
           <span className="empty-icon">🧾</span>
           <p>Belum ada pengeluaran yang cocok dengan filter ini.</p>
@@ -276,7 +309,7 @@ function ExpensesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {expenses.map((e: Expense) => (
+                  {expensesPage.items.map((e) => (
                     <tr
                       key={e.id}
                       onClick={() =>
@@ -321,11 +354,13 @@ function ExpensesPage() {
             >
               ← Sebelumnya
             </button>
-            <span className="muted">Halaman {search.page ?? 1}</span>
+            <span className="muted">
+              Halaman {search.page ?? 1} dari {expensesPage.total_pages} ({expensesPage.total} data)
+            </span>
             <button
               type="button"
               className="secondary"
-              disabled={expenses.length < PAGE_SIZE}
+              disabled={(search.page ?? 1) >= expensesPage.total_pages}
               onClick={() =>
                 navigate({ search: (prev) => ({ ...prev, page: (prev.page ?? 1) + 1 }) })
               }
