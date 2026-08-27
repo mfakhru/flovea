@@ -111,6 +111,13 @@ function ExpensesPage() {
   const categoryById = new Map(categories.map((c: Category) => [c.id, c.name]))
   const userById = new Map(users.map((u: UserSummary) => [u.id, u.display_name]))
 
+  // Only offer categories something was actually spent on — an empty one can
+  // never match a row. The currently selected one stays listed regardless, so
+  // an old link doesn't leave the dropdown showing a blank selection.
+  const filterCategories = categories.filter(
+    (c: Category) => c.usage_count > 0 || c.id === search.category_id,
+  )
+
   const suamiTotal = summary.by_user.find((u) => u.display_name === 'Suami')?.total ?? 0
   const istriTotal = summary.by_user.find((u) => u.display_name === 'Istri')?.total ?? 0
 
@@ -232,7 +239,7 @@ function ExpensesPage() {
                 }
               >
                 <option value="">Semua kategori</option>
-                {categories.map((c: Category) => (
+                {filterCategories.map((c: Category) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>

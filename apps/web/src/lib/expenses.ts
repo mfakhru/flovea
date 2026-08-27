@@ -1,7 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
 import { apiFetch, apiJson } from './api'
 
-export type Category = { id: number; name: string; is_default: boolean }
+export type Category = {
+  id: number
+  name: string
+  is_default: boolean
+  /** Number of expenses using this category — 0 means nothing recorded yet. */
+  usage_count: number
+}
 export type UserSummary = { id: number; display_name: string }
 
 export type Expense = {

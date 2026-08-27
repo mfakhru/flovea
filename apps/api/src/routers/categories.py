@@ -10,7 +10,15 @@ router = APIRouter()
 @router.get("/categories", response_model=list[CategoryOut])
 async def list_categories(request: Request, user: dict = Depends(get_current_user)):
     env = request.scope["env"]
-    return await fetch_all(env.DB, "SELECT * FROM categories ORDER BY name")
+    # usage_count rides along so callers can tell apart a category that is
+    # actually in use from one nobody has spent on yet — the Riwayat filter
+    # hides the latter, while the add/edit forms still offer every category.
+    return await fetch_all(
+        env.DB,
+        "SELECT c.*, COUNT(e.id) AS usage_count FROM categories c "
+        "LEFT JOIN expenses e ON e.category_id = c.id "
+        "GROUP BY c.id ORDER BY c.name",
+    )
 
 
 @router.post("/categories", response_model=CategoryOut, status_code=201)

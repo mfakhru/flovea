@@ -21,6 +21,9 @@ class CategoryOut(BaseModel):
     id: int
     name: str
     is_default: bool
+    # How many expenses use this category. Lets the Riwayat filter drop
+    # categories nobody has spent on yet; 0 for a freshly created one.
+    usage_count: int = 0
 
 
 class CategoryCreate(BaseModel):
