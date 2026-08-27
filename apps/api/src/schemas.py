@@ -97,6 +97,15 @@ class PeriodTotal(BaseModel):
     total: int
 
 
+class IncomeOut(BaseModel):
+    pay_period: str  # YYYY-MM
+    amount: int  # IDR, whole rupiah; 0 means nothing recorded for the period
+
+
+class IncomeUpsert(BaseModel):
+    amount: int
+
+
 class ImportError(BaseModel):
     row: int
     error: str
