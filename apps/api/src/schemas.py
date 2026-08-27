@@ -64,7 +64,13 @@ class UserTotal(BaseModel):
 class ExpenseSummary(BaseModel):
     by_user: list[UserTotal]
     pending_reimburse: int
+    pending_count: int
     special_case_total: int
+
+
+class BulkReimburseResult(BaseModel):
+    count: int
+    total: int
 
 
 class ExpensePage(BaseModel):

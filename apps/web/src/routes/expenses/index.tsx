@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { requireUser } from '../../lib/auth'
 import {
@@ -8,7 +8,9 @@ import {
   listExpenses,
   listPayPeriods,
   listUsers,
+  reimburseAll,
 } from '../../lib/expenses'
+import type { SummaryFilters } from '../../lib/expenses'
 import type { Category, UserSummary } from '../../lib/expenses'
 import { formatDate, formatPeriod, formatRupiah } from '../../lib/format'
 
@@ -52,33 +54,54 @@ export const Route = createFileRoute('/expenses/')({
     const year = monthScoped ? latestYear : undefined
     const month = monthScoped ? latestMonth : undefined
 
+    // Also handed to the "Reimburse Semua" button as-is, so the bulk action
+    // always settles exactly the set the summary (and its pending total) was
+    // computed from — never a stale or differently-scoped set of rows.
+    const summaryFilters: SummaryFilters = {
+      year,
+      month,
+      category_id: deps.category_id,
+      q: deps.q,
+      pay_period: deps.pay_period,
+    }
     const [expensesPage, categories, users, summary, payPeriods] = await Promise.all([
       listExpenses({ data: { ...deps, year, month } }),
       listCategories(),
       listUsers(),
-      getExpensesSummary({
-        data: {
-          year,
-          month,
-          category_id: deps.category_id,
-          q: deps.q,
-          pay_period: deps.pay_period,
-        },
-      }),
+      getExpensesSummary({ data: summaryFilters }),
       listPayPeriods(),
     ])
     const periodLabel = monthScoped && latest.month ? formatPeriod(latest.month) : null
-    return { expensesPage, categories, users, summary, payPeriods, periodLabel, filtered }
+    return { expensesPage, categories, users, summary, payPeriods, periodLabel, filtered, summaryFilters }
   },
   component: ExpensesPage,
 })
 
 function ExpensesPage() {
   const search = Route.useSearch()
-  const { expensesPage, categories, users, summary, payPeriods, periodLabel, filtered } =
+  const { expensesPage, categories, users, summary, payPeriods, periodLabel, filtered, summaryFilters } =
     Route.useLoaderData()
   const navigate = useNavigate({ from: Route.fullPath })
+  const router = useRouter()
   const [searchInput, setSearchInput] = useState(search.q ?? '')
+  const [reimbursing, setReimbursing] = useState(false)
+
+  async function handleReimburseAll() {
+    const ok = confirm(
+      `Lunasi ${summary.pending_count} transaksi senilai ${formatRupiah(summary.pending_reimburse)}? ` +
+        'Semua akan ditandai sudah dibayarkan ke Istri.',
+    )
+    if (!ok) return
+    setReimbursing(true)
+    try {
+      await reimburseAll({ data: summaryFilters })
+      await router.invalidate()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal melunasi semua')
+    } finally {
+      setReimbursing(false)
+    }
+  }
   // `all` isn't counted — the scope line above the cards already says
   // whether the whole history is showing, and offers the way back.
   const activeFilterCount = [
@@ -172,6 +195,14 @@ function ExpensesPage() {
           <div className="stat-card stat-card-warn">
             <span className="stat-label">Perlu dibayarkan</span>
             <span className="stat-value">{formatRupiah(summary.pending_reimburse)}</span>
+            <button
+              type="button"
+              className="secondary btn-sm"
+              onClick={handleReimburseAll}
+              disabled={reimbursing}
+            >
+              {reimbursing ? 'Memproses...' : `Reimburse Semua (${summary.pending_count})`}
+            </button>
           </div>
         )}
       </div>

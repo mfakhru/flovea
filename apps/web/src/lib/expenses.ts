@@ -67,8 +67,10 @@ export type UserTotal = { user_id: number; display_name: string; total: number }
 export type ExpenseSummary = {
   by_user: UserTotal[]
   pending_reimburse: number
+  pending_count: number
   special_case_total: number
 }
+export type BulkReimburseResult = { count: number; total: number }
 export type ExpensePage = {
   items: Expense[]
   page: number
@@ -195,6 +197,23 @@ export const toggleReimburse = createServerFn({ method: 'POST' })
     async ({ data }): Promise<Expense> =>
       apiJson<Expense>(`/expenses/${data.id}/reimburse`, { method: 'POST' }),
   )
+
+/** Marks every pending expense matching the given filters as reimbursed in
+ * one request — the filters mirror SummaryFilters so it settles exactly the
+ * amount shown under "Perlu dibayarkan". */
+export const reimburseAll = createServerFn({ method: 'POST' })
+  .validator((filters: SummaryFilters) => filters)
+  .handler(async ({ data }): Promise<BulkReimburseResult> => {
+    const params = new URLSearchParams()
+    if (data.year) params.set('year', String(data.year))
+    if (data.month) params.set('month', String(data.month))
+    if (data.category_id) params.set('category_id', String(data.category_id))
+    if (data.q) params.set('q', data.q)
+    if (data.pay_period) params.set('pay_period', data.pay_period)
+    return apiJson<BulkReimburseResult>(`/expenses/reimburse-all?${params.toString()}`, {
+      method: 'POST',
+    })
+  })
 
 export const deleteExpense = createServerFn({ method: 'POST' })
   .validator((data: { id: number }) => data)

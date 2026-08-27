@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from db import execute, fetch_all, fetch_one
 from schemas import (
+    BulkReimburseResult,
     CategoryTotal,
     ExpenseCreate,
     ExpenseOut,
@@ -32,6 +33,15 @@ IS_SPECIAL_CASE_SQL = (
     "(substr(COALESCE(notes, ''), 1, 2) = ? OR substr(COALESCE(detail, ''), 1, 2) = ?)"
 )
 NOT_SPECIAL_CASE_CLAUSE = f"NOT {IS_SPECIAL_CASE_SQL}"
+
+
+async def _get_istri_id(env) -> int:
+    """The one user who isn't Suami — reimbursement always settles to them,
+    regardless of which of the two accounts happens to click the button."""
+    row = await fetch_one(env.DB, "SELECT id FROM users WHERE display_name != ?", SUAMI_DISPLAY_NAME)
+    if not row:
+        raise HTTPException(status_code=500, detail="Istri user not found")
+    return row["id"]
 
 
 def _date_range_clause(year: int | None, month: int | None) -> tuple[str, list] | None:
@@ -161,7 +171,7 @@ async def get_expenses_summary(
     pending_where = f"WHERE {' AND '.join(non_special_clauses)}"
     pending_row = await fetch_one(
         env.DB,
-        f"SELECT COALESCE(SUM(amount), 0) AS total FROM expenses {pending_where}",
+        f"SELECT COUNT(*) AS cnt, COALESCE(SUM(amount), 0) AS total FROM expenses {pending_where}",
         *params,
         SPECIAL_CASE_PREFIX,
         SPECIAL_CASE_PREFIX,
@@ -174,6 +184,7 @@ async def get_expenses_summary(
     return {
         "by_user": by_user,
         "pending_reimburse": pending_row["total"] if pending_row else 0,
+        "pending_count": pending_row["cnt"] if pending_row else 0,
         "special_case_total": special_case_total,
     }
 
@@ -265,6 +276,38 @@ async def get_latest_month(request: Request, user: dict = Depends(get_current_us
     return {"month": latest[:7] if latest else None}
 
 
+@router.post("/expenses/reimburse-all", response_model=BulkReimburseResult)
+async def reimburse_all(
+    request: Request,
+    year: int | None = None,
+    month: int | None = None,
+    category_id: int | None = None,
+    q: str | None = None,
+    pay_period: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Mark every pending, non-special-case expense matching the given filters
+    as reimbursed in one round-trip — same filter shape and same pending set
+    as /expenses/summary, so the confirmed amount always matches what the
+    Riwayat page showed under "Perlu dibayarkan"."""
+    env = request.scope["env"]
+    clauses, params = _build_filters(year, month, category_id, q, pay_period)
+    clauses += [NOT_SPECIAL_CASE_CLAUSE, "needs_reimburse = 1", "reimbursed_at IS NULL"]
+    where = f"WHERE {' AND '.join(clauses)}"
+
+    istri_id = await _get_istri_id(env)
+    rows = await fetch_all(
+        env.DB,
+        f"UPDATE expenses SET reimbursed_at = datetime('now'), reimbursed_by = ? {where} "
+        "RETURNING id, amount",
+        istri_id,
+        *params,
+        SPECIAL_CASE_PREFIX,
+        SPECIAL_CASE_PREFIX,
+    )
+    return {"count": len(rows), "total": sum(row["amount"] for row in rows)}
+
+
 @router.get("/expenses/{expense_id}", response_model=ExpenseOut)
 async def get_expense(expense_id: int, request: Request, user: dict = Depends(get_current_user)):
     env = request.scope["env"]
@@ -340,15 +383,22 @@ async def toggle_reimburse(expense_id: int, request: Request, user: dict = Depen
     if not existing["needs_reimburse"]:
         raise HTTPException(status_code=400, detail="Expense is not marked for reimbursement")
 
-    await execute(
-        env.DB,
-        "UPDATE expenses SET "
-        "reimbursed_at = CASE WHEN reimbursed_at IS NULL THEN datetime('now') ELSE NULL END, "
-        "reimbursed_by = CASE WHEN reimbursed_at IS NULL THEN ? ELSE NULL END "
-        "WHERE id = ?",
-        user["sub"],
-        expense_id,
-    )
+    if existing["reimbursed_at"] is None:
+        # Reimbursement always settles to Istri, regardless of which of the
+        # two accounts happens to click the toggle — matches /reimburse-all.
+        istri_id = await _get_istri_id(env)
+        await execute(
+            env.DB,
+            "UPDATE expenses SET reimbursed_at = datetime('now'), reimbursed_by = ? WHERE id = ?",
+            istri_id,
+            expense_id,
+        )
+    else:
+        await execute(
+            env.DB,
+            "UPDATE expenses SET reimbursed_at = NULL, reimbursed_by = NULL WHERE id = ?",
+            expense_id,
+        )
     return await fetch_one(env.DB, "SELECT * FROM expenses WHERE id = ?", expense_id)
 
 
