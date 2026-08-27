@@ -9,6 +9,12 @@ export type Category = {
   usage_count: number
 }
 /**
+ * Preselected in the Tambah form — most expenses are Makan, so this saves a
+ * click on the common case.
+ */
+export const DEFAULT_CATEGORY_NAME = 'Makan'
+
+/**
  * The seeded catch-all category. Picking it in the Tambah form is what reveals
  * the "kategori baru" input — mirrors the name seeded in migration 0002.
  */

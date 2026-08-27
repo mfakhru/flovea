@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
 import { SUAMI_DISPLAY_NAME, requireUser } from '../../lib/auth'
 import {
+  DEFAULT_CATEGORY_NAME,
   OTHERS_CATEGORY_NAME,
   createCategory,
   createExpense,
@@ -36,7 +37,9 @@ function NewExpensePage() {
   const router = useRouter()
   const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [expenseDate, setExpenseDate] = useState(todayIso())
-  const [categoryId, setCategoryId] = useState<number | ''>(categories[0]?.id ?? '')
+  const defaultCategory =
+    categories.find((c) => c.name === DEFAULT_CATEGORY_NAME) ?? categories[0]
+  const [categoryId, setCategoryId] = useState<number | ''>(defaultCategory?.id ?? '')
   const [newCategory, setNewCategory] = useState('')
   const [detail, setDetail] = useState('')
   const [amount, setAmount] = useState('')
