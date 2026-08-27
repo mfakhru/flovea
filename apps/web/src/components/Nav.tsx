@@ -38,7 +38,8 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
         <div className={`links ${open ? 'links-open' : ''}`}>
           {user ? (
             <>
-              <Link to="/" onClick={() => setOpen(false)}>
+              {/* exact, or "/" would match every route and stay highlighted */}
+              <Link to="/" activeOptions={{ exact: true }} onClick={() => setOpen(false)}>
                 Home
               </Link>
               <Link to="/expenses" onClick={() => setOpen(false)}>

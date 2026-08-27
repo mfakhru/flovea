@@ -11,6 +11,29 @@ export function formatRupiah(amount: number) {
   }).format(amount)
 }
 
+/**
+ * Shortened rupiah for tight spots — stat cards on a phone, chart axis
+ * labels. `Rp 12,4 jt` instead of `Rp 12.400.000`, which would otherwise
+ * overflow a half-width card at 360px. The full value stays in tooltips
+ * and on Riwayat, so nothing is ever only available in rounded form.
+ */
+export function formatRupiahCompact(amount: number) {
+  const abs = Math.abs(amount)
+  const sign = amount < 0 ? '-' : ''
+  const short = (value: number, unit: string) => {
+    // one decimal, but drop a trailing ",0" — "Rp 12 jt" beats "Rp 12,0 jt"
+    const rounded = Math.round(value * 10) / 10
+    const text = Number.isInteger(rounded)
+      ? String(rounded)
+      : rounded.toFixed(1).replace('.', ',')
+    return `${sign}Rp ${text} ${unit}`
+  }
+  if (abs >= 1_000_000_000) return short(abs / 1_000_000_000, 'M')
+  if (abs >= 1_000_000) return short(abs / 1_000_000, 'jt')
+  if (abs >= 1_000) return short(abs / 1_000, 'rb')
+  return formatRupiah(amount)
+}
+
 export function formatDate(iso: string) {
   const [year, month, day] = iso.split('-')
   return `${day} ${MONTHS[Number(month) - 1]?.slice(0, 3)} ${year}`

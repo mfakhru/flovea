@@ -192,7 +192,7 @@ function ExpensesPage() {
           <span className="stat-value">{formatRupiah(summary.special_case_total)}</span>
         </div>
         {summary.pending_reimburse > 0 && (
-          <div className="stat-card stat-card-warn">
+          <div className="stat-card stat-warn">
             <span className="stat-label">Perlu dibayarkan</span>
             <span className="stat-value">{formatRupiah(summary.pending_reimburse)}</span>
             <button
