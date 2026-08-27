@@ -1,7 +1,12 @@
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
 import { SUAMI_DISPLAY_NAME, requireUser } from '../../lib/auth'
-import { createCategory, createExpense, listCategories } from '../../lib/expenses'
+import {
+  OTHERS_CATEGORY_NAME,
+  createCategory,
+  createExpense,
+  listCategories,
+} from '../../lib/expenses'
 import type { Category } from '../../lib/expenses'
 
 export const Route = createFileRoute('/expenses/new')({
@@ -40,6 +45,12 @@ function NewExpensePage() {
   const [needsReimburse, setNeedsReimburse] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // The "kategori baru" input only belongs on screen once the catch-all is
+  // picked — otherwise every visit offers to grow the category list, which is
+  // how the unused ones piled up in the first place.
+  const isOthersSelected =
+    categories.find((c) => c.id === categoryId)?.name === OTHERS_CATEGORY_NAME
 
   function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
     const digits = e.target.value.replace(/[^0-9]/g, '')
@@ -130,21 +141,29 @@ function NewExpensePage() {
               </option>
             ))}
           </select>
-          <div className="row" style={{ marginTop: '0.5rem', flexWrap: 'nowrap' }}>
-            <input
-              placeholder="Kategori baru..."
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-            />
-            <button
-              type="button"
-              className="secondary"
-              onClick={handleAddCategory}
-              disabled={!newCategory.trim()}
-            >
-              Tambah
-            </button>
-          </div>
+          {isOthersSelected && (
+            <>
+              <div className="row" style={{ marginTop: '0.5rem', flexWrap: 'nowrap' }}>
+                <input
+                  placeholder="Kategori baru..."
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={handleAddCategory}
+                  disabled={!newCategory.trim()}
+                >
+                  Tambah
+                </button>
+              </div>
+              <p className="field-hint">
+                Isi kalau mau bikin kategori baru — setelah ditambah, kategorinya langsung
+                terpilih. Kosongkan saja kalau memang mau dicatat sebagai Others.
+              </p>
+            </>
+          )}
         </div>
 
         <div className="field">

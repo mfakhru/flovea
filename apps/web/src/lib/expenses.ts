@@ -8,6 +8,12 @@ export type Category = {
   /** Number of expenses using this category — 0 means nothing recorded yet. */
   usage_count: number
 }
+/**
+ * The seeded catch-all category. Picking it in the Tambah form is what reveals
+ * the "kategori baru" input — mirrors the name seeded in migration 0002.
+ */
+export const OTHERS_CATEGORY_NAME = 'Others'
+
 export type UserSummary = { id: number; display_name: string }
 
 export type Expense = {
