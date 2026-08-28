@@ -204,9 +204,8 @@ nav.app-nav .brand:hover {
 
 .brand-logo {
   display: block;
-  width: 38px;
-  height: 38px;
-  object-fit: contain;
+  height: 40px;
+  width: auto;
 }
 
 .links {
@@ -1782,10 +1781,9 @@ tbody tr:last-child td {
 
 .auth-logo {
   display: block;
-  width: 64px;
-  height: 64px;
+  height: 96px;
+  width: auto;
   margin: 0 auto 0.875rem;
-  object-fit: contain;
 }
 
 .auth-brand h1 {

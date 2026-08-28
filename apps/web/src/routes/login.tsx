@@ -36,7 +36,7 @@ function LoginPage() {
     <main className="auth-page">
       <div className="auth-card card">
         <div className="auth-brand">
-          <img className="auth-logo" src="/logo-mark.png" alt="Flovea" width={64} height={64} />
+          <img className="auth-logo" src="/logo-mark.png" alt="Flovea" width={127} height={96} />
           <h1>Flovea</h1>
           <p className="muted">Masuk buat catat pengeluaran</p>
         </div>
