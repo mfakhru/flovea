@@ -1,67 +1,97 @@
 import sharp from 'sharp'
 import { writeFileSync } from 'node:fs'
 
-const SRC = 'logo/logo-flo.png'
+const SRC = 'logo/logo.png'
 const OUT = 'public'
-// icon tile bounds inside the artwork, measured pixel-by-pixel
-const TILE = { left: 178, top: 219, width: 400, height: 421 }
+// The "o" of the wordmark — circle + wallet + leaf — is the only part of the
+// lockup that stands on its own at icon sizes. Bounds measured off the artwork.
+const MARK = { left: 636, top: 279, width: 473, height: 579 }
+const CANVAS = 596 // square canvas; the mark is 579 tall, so ~1.5% breathing room
 
-// 1. crop the tile and square it off
-const square = await sharp(SRC).extract(TILE).resize(1024, 1024, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true })
+// sharp applies extend after resize, so square it off in its own pass first
+const cropped = await sharp(SRC).extract(MARK).png().toBuffer()
+const squared = await sharp(cropped)
+  .extend({
+    top: Math.floor((CANVAS - MARK.height) / 2),
+    bottom: Math.ceil((CANVAS - MARK.height) / 2),
+    left: Math.floor((CANVAS - MARK.width) / 2),
+    right: Math.ceil((CANVAS - MARK.width) / 2),
+    background: '#ffffff',
+  })
+  .png()
+  .toBuffer()
+const padded = await sharp(squared).resize(1024, 1024).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+if (padded.info.width !== 1024 || padded.info.height !== 1024) throw new Error('unexpected mask size')
+
+// Knock out the paper-white backdrop, but only the region connected to the
+// border: the wallet inside the circle is nearly the same white and has to stay.
 const S = 1024
-const { data, info } = square
+const { data, info } = padded
 const C = info.channels
+const bg = [253, 253, 253]
+const dist = (i) => Math.hypot(data[i * C] - bg[0], data[i * C + 1] - bg[1], data[i * C + 2] - bg[2])
 
-// 2. derive alpha from the artwork itself: outside the tile's rounded corners the
-// source is pure black, the tile itself is never below ~380 summed brightness.
+const outside = new Uint8Array(S * S)
+const stack = []
+for (let x = 0; x < S; x++) stack.push(x, (S - 1) * S + x)
+for (let y = 0; y < S; y++) stack.push(y * S, y * S + S - 1)
+while (stack.length) {
+  const p = stack.pop()
+  if (outside[p] || dist(p) > 60) continue
+  outside[p] = 1
+  const x = p % S
+  const y = (p - x) / S
+  if (x > 0) stack.push(p - 1)
+  if (x < S - 1) stack.push(p + 1)
+  if (y > 0) stack.push(p - S)
+  if (y < S - 1) stack.push(p + S)
+}
+
+// Feather the cut using colour distance so edges stay anti-aliased.
 const rgba = Buffer.alloc(S * S * 4)
-for (let i = 0, j = 0; i < S * S; i++, j += C) {
-  const sum = data[j] + data[j + 1] + data[j + 2]
-  const a = sum <= 60 ? 0 : sum >= 150 ? 255 : Math.round(((sum - 60) / 90) * 255)
-  rgba[i * 4] = data[j]
-  rgba[i * 4 + 1] = data[j + 1]
-  rgba[i * 4 + 2] = data[j + 2]
-  rgba[i * 4 + 3] = a
+for (let p = 0; p < S * S; p++) {
+  rgba[p * 4] = data[p * C]
+  rgba[p * 4 + 1] = data[p * C + 1]
+  rgba[p * 4 + 2] = data[p * C + 2]
+  const d = dist(p)
+  rgba[p * 4 + 3] = !outside[p] ? 255 : d <= 12 ? 0 : d >= 45 ? 255 : Math.round(((d - 12) / 33) * 255)
 }
 const mark = () => sharp(rgba, { raw: { width: S, height: S, channels: 4 } })
 
-const png = (n) => mark().resize(n, n).png({ compressionLevel: 9, palette: true, effort: 10 }).toBuffer()
+const opts = { compressionLevel: 9, palette: true, effort: 10 }
+const png = (n) => mark().resize(n, n).png(opts).toBuffer()
 
-// transparent-corner marks
 for (const n of [512, 192]) writeFileSync(`${OUT}/icon-${n}.png`, await png(n))
 writeFileSync(`${OUT}/logo-mark.png`, await png(128))
 
-// full-bleed variants: the mark sitting on the tile's own blue gradient
-const bg = (n) => Buffer.from(
-  `<svg width="${n}" height="${n}" xmlns="http://www.w3.org/2000/svg">
-     <defs><linearGradient id="g" x1="1" y1="0" x2="0" y2="1">
-       <stop offset="0" stop-color="#17bffb"/><stop offset="1" stop-color="#0067d6"/>
-     </linearGradient></defs>
-     <rect width="${n}" height="${n}" fill="url(#g)"/>
-   </svg>`,
-)
+// Full-bleed variants: the OS masks these, so they need an opaque square.
 const bleed = async (n, scale) => {
   const inner = Math.round(n * scale)
   const pad = Math.round((n - inner) / 2)
-  return sharp(bg(n))
+  return sharp({ create: { width: n, height: n, channels: 4, background: '#ffffff' } })
     .composite([{ input: await mark().resize(inner, inner).png().toBuffer(), top: pad, left: pad }])
-    .png({ compressionLevel: 9, palette: true, effort: 10 })
+    .png(opts)
     .toBuffer()
 }
-writeFileSync(`${OUT}/apple-touch-icon.png`, await bleed(180, 0.9))
-writeFileSync(`${OUT}/icon-maskable-512.png`, await bleed(512, 0.68))
+writeFileSync(`${OUT}/apple-touch-icon.png`, await bleed(180, 0.94))
+writeFileSync(`${OUT}/icon-maskable-512.png`, await bleed(512, 0.66))
 
 // favicon.ico — 16/32/48 PNG entries in an ICO container
 const sizes = [16, 32, 48]
 const imgs = await Promise.all(sizes.map(png))
 const header = Buffer.alloc(6)
-header.writeUInt16LE(0, 0); header.writeUInt16LE(1, 2); header.writeUInt16LE(sizes.length, 4)
+header.writeUInt16LE(0, 0)
+header.writeUInt16LE(1, 2)
+header.writeUInt16LE(sizes.length, 4)
 let offset = 6 + 16 * sizes.length
 const dir = sizes.map((n, i) => {
   const e = Buffer.alloc(16)
-  e[0] = n; e[1] = n; e[2] = 0; e[3] = 0
-  e.writeUInt16LE(1, 4); e.writeUInt16LE(32, 6)
-  e.writeUInt32LE(imgs[i].length, 8); e.writeUInt32LE(offset, 12)
+  e[0] = n
+  e[1] = n
+  e.writeUInt16LE(1, 4)
+  e.writeUInt16LE(32, 6)
+  e.writeUInt32LE(imgs[i].length, 8)
+  e.writeUInt32LE(offset, 12)
   offset += imgs[i].length
   return e
 })
