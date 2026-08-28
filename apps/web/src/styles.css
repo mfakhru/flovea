@@ -203,14 +203,10 @@ nav.app-nav .brand:hover {
 }
 
 .brand-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 34px;
   height: 34px;
-  border-radius: var(--r-sm);
-  background: var(--primary-soft);
-  font-size: 1.0625rem;
+  object-fit: contain;
 }
 
 .links {
@@ -1785,15 +1781,11 @@ tbody tr:last-child td {
 }
 
 .auth-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 56px;
   height: 56px;
-  margin-bottom: 0.875rem;
-  border-radius: var(--r-lg);
-  background: var(--primary-soft);
-  font-size: 1.75rem;
+  margin: 0 auto 0.875rem;
+  object-fit: contain;
 }
 
 .auth-brand h1 {
