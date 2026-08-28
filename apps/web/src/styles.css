@@ -335,6 +335,10 @@ main.page {
   border-radius: var(--r-2xl);
   box-shadow: var(--shadow);
   padding: clamp(1.25rem, 4vw, 1.75rem);
+  /* A card in .dashboard-grid is much narrower than the viewport (~284px of
+     content at 768px, where the grid is still 2-up), so its contents have to
+     respond to the card, not the window — see the @container block below. */
+  container-type: inline-size;
 }
 
 /* =========================================================
@@ -1816,6 +1820,36 @@ tbody tr:last-child td {
   font-size: 1rem;
   font-weight: 700;
   margin-bottom: 0.75rem;
+}
+
+/* =========================================================
+   Narrow card (container query)
+   =========================================================
+   Independent of the viewport: a card sitting in the two-column dashboard
+   grid on a tablet is narrower than the same card full-width on a phone.
+   The donut needs ~180px and its legend ~150px plus the gap, so below ~400px
+   of card width they no longer fit side by side and used to spill out of the
+   card (and off the page) between roughly 768px and 960px of viewport. */
+
+@container (max-width: 400px) {
+  .donut-wrap {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    justify-items: center;
+  }
+
+  .donut-figure {
+    width: min(210px, 62cqw);
+  }
+
+  .donut-legend {
+    width: 100%;
+  }
+
+  /* The trend plot scrolls at this width too, so say so. */
+  .chart-hint {
+    display: block;
+  }
 }
 
 /* =========================================================
