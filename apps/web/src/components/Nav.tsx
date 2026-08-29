@@ -18,7 +18,7 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
     <nav className="app-nav">
       <div className="container nav-row">
         <Link to={user ? '/' : '/login'} className="brand" onClick={() => setOpen(false)}>
-          <img className="brand-logo" src="/logo-mark.png" alt="" width={53} height={40} /> Flovea
+          <img className="brand-logo" src="/logo-mark.png" alt="" width={63} height={40} /> Flovea
         </Link>
         {user && (
           <button

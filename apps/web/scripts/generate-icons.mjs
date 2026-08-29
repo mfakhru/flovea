@@ -5,57 +5,29 @@ const SRC = 'logo/logo.png'
 const OUT = 'public'
 // The full lockup — "flo", the wallet mark, and the tagline. Bounds are the
 // artwork's ink, measured off the source; the file itself carries wide margins.
-const INK = { left: 182, top: 269, width: 927, height: 702 }
-const SIDE = 1000 // square working canvas, ~4% margin around the lockup
+// The source is already transparent outside the lockup, so the ink is just
+// everything with a non-zero alpha.
+const INK = { left: 466, top: 669, width: 1113, height: 710 }
+const SIDE = 1200 // square working canvas, ~3.7% margin around the lockup
 const PAD = { left: Math.round((SIDE - INK.width) / 2), top: Math.round((SIDE - INK.height) / 2) }
 
-const cropped = await sharp(SRC).extract(INK).png().toBuffer()
-const squared = await sharp(cropped)
+// Centre the lockup on a transparent square. Nothing is recoloured or
+// rescaled non-uniformly, so the artwork keeps its own aspect ratio. Rendered
+// once up front: sharp applies extend *after* resize within a single pipeline,
+// so the square has to be materialised before anything downstream resizes it.
+const squareBuf = await sharp(SRC)
+  .ensureAlpha()
+  .extract(INK)
   .extend({
     left: PAD.left,
     right: SIDE - INK.width - PAD.left,
     top: PAD.top,
     bottom: SIDE - INK.height - PAD.top,
-    background: '#ffffff',
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
   })
-  .removeAlpha()
-  .raw()
-  .toBuffer({ resolveWithObject: true })
-
-const { data, info } = squared
-const C = info.channels
-if (info.width !== SIDE || info.height !== SIDE) throw new Error('unexpected canvas size')
-
-// Knock out the paper-white backdrop, but only the region connected to the
-// border: the wallet inside the mark is nearly the same white and has to stay.
-const bg = [253, 253, 253]
-const dist = (i) => Math.hypot(data[i * C] - bg[0], data[i * C + 1] - bg[1], data[i * C + 2] - bg[2])
-const outside = new Uint8Array(SIDE * SIDE)
-const stack = []
-for (let x = 0; x < SIDE; x++) stack.push(x, (SIDE - 1) * SIDE + x)
-for (let y = 0; y < SIDE; y++) stack.push(y * SIDE, y * SIDE + SIDE - 1)
-while (stack.length) {
-  const p = stack.pop()
-  if (outside[p] || dist(p) > 60) continue
-  outside[p] = 1
-  const x = p % SIDE
-  const y = (p - x) / SIDE
-  if (x > 0) stack.push(p - 1)
-  if (x < SIDE - 1) stack.push(p + 1)
-  if (y > 0) stack.push(p - SIDE)
-  if (y < SIDE - 1) stack.push(p + SIDE)
-}
-
-// Feather the cut using colour distance so edges stay anti-aliased.
-const rgba = Buffer.alloc(SIDE * SIDE * 4)
-for (let p = 0; p < SIDE * SIDE; p++) {
-  rgba[p * 4] = data[p * C]
-  rgba[p * 4 + 1] = data[p * C + 1]
-  rgba[p * 4 + 2] = data[p * C + 2]
-  const d = dist(p)
-  rgba[p * 4 + 3] = !outside[p] ? 255 : d <= 12 ? 0 : d >= 45 ? 255 : Math.round(((d - 12) / 33) * 255)
-}
-const square = () => sharp(rgba, { raw: { width: SIDE, height: SIDE, channels: 4 } })
+  .png()
+  .toBuffer()
+const square = () => sharp(squareBuf)
 
 const opts = { compressionLevel: 9, palette: true, effort: 10 }
 const png = (n) => square().resize(n, n).png(opts).toBuffer()
@@ -66,11 +38,7 @@ for (const n of [512, 192]) writeFileSync(`${OUT}/icon-${n}.png`, await png(n))
 // height in the nav and login card without a slab of empty space around it.
 writeFileSync(
   `${OUT}/logo-mark.png`,
-  await square()
-    .extract({ left: PAD.left, top: PAD.top, width: INK.width, height: INK.height })
-    .resize({ height: 320 })
-    .png(opts)
-    .toBuffer(),
+  await sharp(SRC).ensureAlpha().extract(INK).resize({ height: 320 }).png(opts).toBuffer(),
 )
 
 // Full-bleed variants: the OS masks these, so they need an opaque square.
