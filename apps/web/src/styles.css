@@ -769,7 +769,42 @@ main.page {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 1rem;
+}
+
+.table-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
   margin-bottom: 0.625rem;
+}
+
+/* Zoom out the table the way a spreadsheet does, for when scrolling sideways
+   isn't enough to compare two distant columns. Pinching the table does the
+   same thing; these buttons are the pointer-and-keyboard way in, and the
+   readout doubles as the hint that the table is currently scaled down. */
+.zoom-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.zoom-control button {
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.zoom-value {
+  min-width: 3rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
 }
 
 .chart-hint {
@@ -1606,6 +1641,9 @@ button.danger:hover,
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+  /* One finger still pans the page and the table; two fingers are handed to
+     the pinch-zoom handler instead of the browser's own page zoom. */
+  touch-action: pan-x pan-y;
 }
 
 .table-scroll::-webkit-scrollbar {

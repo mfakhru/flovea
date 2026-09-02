@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { requireUser } from '../../lib/auth'
 import {
   getExpensesSummary,
@@ -12,6 +12,16 @@ import {
 import type { SummaryFilters } from '../../lib/expenses'
 import type { Category, UserSummary } from '../../lib/expenses'
 import { formatDateShort, formatPeriod, formatPeriodShort, formatRupiah } from '../../lib/format'
+
+// Pinch-to-zoom bounds for the table. At 100% a phone shows about three of
+// its seven columns, which makes it impossible to read a row's date and its
+// nominal at once; half size fits the lot on a 360px screen.
+const MIN_ZOOM = 0.5
+const MAX_ZOOM = 1
+const ZOOM_STEP = 0.1
+
+const clampZoom = (value: number) =>
+  Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 100) / 100))
 
 type ExpensesSearch = {
   user_id?: number
@@ -85,6 +95,58 @@ function ExpensesPage() {
   const router = useRouter()
   const [searchInput, setSearchInput] = useState(search.q ?? '')
   const [reimbursing, setReimbursing] = useState(false)
+  const [zoom, setZoom] = useState(1)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  // Read only at the start of a gesture, so the listeners below can be bound
+  // once instead of re-bound on every zoom change — re-binding mid-pinch would
+  // drop the gesture's starting reference and make the table jump.
+  const zoomRef = useRef(zoom)
+  // A pinch ends with a touchend over a row, which the browser then reports as
+  // a click; without this the gesture would open that row's edit page.
+  const pinchedRef = useRef(false)
+
+  useEffect(() => {
+    zoomRef.current = zoom
+  }, [zoom])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const spread = (touches: TouchList) =>
+      Math.hypot(
+        touches[0]!.clientX - touches[1]!.clientX,
+        touches[0]!.clientY - touches[1]!.clientY,
+      )
+    let start: { spread: number; zoom: number } | null = null
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) pinchedRef.current = false
+      if (e.touches.length !== 2) return
+      start = { spread: spread(e.touches), zoom: zoomRef.current }
+    }
+    const onMove = (e: TouchEvent) => {
+      if (!start || e.touches.length !== 2) return
+      // Non-passive on purpose: without this the browser zooms the whole page
+      // instead, which is the behaviour we're replacing.
+      e.preventDefault()
+      pinchedRef.current = true
+      setZoom(clampZoom((start.zoom * spread(e.touches)) / start.spread))
+    }
+    const onEnd = () => {
+      start = null
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd)
+    el.addEventListener('touchcancel', onEnd)
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', onEnd)
+    }
+  }, [])
 
   async function handleReimburseAll() {
     const ok = confirm(
@@ -317,20 +379,43 @@ function ExpensesPage() {
         </div>
       ) : (
         <>
-          <div className="owner-legend">
-            <span className="chart-legend-item">
-              <span className="legend-dot legend-dot-suami" />
-              Suami
-            </span>
-            <span className="chart-legend-item">
-              <span className="legend-dot legend-dot-istri" />
-              Istri
-            </span>
+          <div className="table-tools">
+            <div className="owner-legend">
+              <span className="chart-legend-item">
+                <span className="legend-dot legend-dot-suami" />
+                Suami
+              </span>
+              <span className="chart-legend-item">
+                <span className="legend-dot legend-dot-istri" />
+                Istri
+              </span>
+            </div>
+            <div className="zoom-control">
+              <button
+                type="button"
+                className="secondary"
+                aria-label="Perkecil tabel"
+                disabled={zoom <= MIN_ZOOM}
+                onClick={() => setZoom((z) => clampZoom(z - ZOOM_STEP))}
+              >
+                −
+              </button>
+              <span className="zoom-value">{Math.round(zoom * 100)}%</span>
+              <button
+                type="button"
+                className="secondary"
+                aria-label="Perbesar tabel"
+                disabled={zoom >= MAX_ZOOM}
+                onClick={() => setZoom((z) => clampZoom(z + ZOOM_STEP))}
+              >
+                +
+              </button>
+            </div>
           </div>
-          <p className="table-hint">↔ Geser tabel buat lihat kolom lainnya</p>
+          <p className="table-hint">↔ Geser atau cubit tabel buat lihat kolom lainnya</p>
           <div className="table-wrap">
-            <div className="table-scroll">
-              <table className="expenses-table">
+            <div className="table-scroll" ref={scrollRef}>
+              <table className="expenses-table" style={{ zoom: String(zoom) }}>
                 <thead>
                   <tr>
                     <th className="sortable" onClick={toggleSort}>
@@ -350,9 +435,10 @@ function ExpensesPage() {
                       key={e.id}
                       className={ownerRowClass(e.user_id)}
                       title={userById.get(e.user_id) ?? undefined}
-                      onClick={() =>
+                      onClick={() => {
+                        if (pinchedRef.current) return
                         navigate({ to: '/expenses/$id/edit', params: { id: String(e.id) } })
-                      }
+                      }}
                     >
                       <td>{formatDateShort(e.expense_date)}</td>
                       <td>
