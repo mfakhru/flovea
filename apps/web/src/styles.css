@@ -35,6 +35,17 @@
   --balance: #6366f1;
   --balance-soft: #eef2ff;
 
+  /* Owner tints for the Riwayat rows — they stand in for the "Orang" column.
+     Pre-mixed against --surface rather than written as rgba(): the frozen
+     first column must stay opaque or the rows scrolling underneath it show
+     through. Kept pale so the text on top keeps its contrast. */
+  --owner-suami: #eef4fe;
+  --owner-suami-hover: #dfeafc;
+  --owner-suami-dot: #6f9fe8;
+  --owner-istri: #fdeef4;
+  --owner-istri-hover: #fbe0eb;
+  --owner-istri-dot: #ec8fb4;
+
   /* status */
   --danger: #e11d48;
   --danger-soft: #fff1f3;
@@ -743,6 +754,22 @@ main.page {
 
 .legend-dot-expense {
   background: var(--expense);
+}
+
+.legend-dot-suami {
+  background: var(--owner-suami-dot);
+}
+
+.legend-dot-istri {
+  background: var(--owner-istri-dot);
+}
+
+/* Decodes the row tints on Riwayat now that the "Orang" column is gone. */
+.owner-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.625rem;
 }
 
 .chart-hint {
@@ -1596,7 +1623,7 @@ table {
 }
 
 .expenses-table {
-  min-width: 780px;
+  min-width: 680px;
 }
 
 th,
@@ -1636,13 +1663,44 @@ th.amount {
   font-weight: 700;
 }
 
+/* Owner tint. Carried as a variable rather than set as a background so the
+   frozen first column below — which needs its own opaque background — and the
+   hover state both read the same value instead of overriding each other. */
+.expenses-table tbody tr {
+  --row-bg: var(--surface);
+}
+
+.expenses-table tbody tr.row-suami {
+  --row-bg: var(--owner-suami);
+}
+
+.expenses-table tbody tr.row-istri {
+  --row-bg: var(--owner-istri);
+}
+
+.expenses-table tbody tr:hover {
+  --row-bg: var(--primary-soft);
+}
+
+.expenses-table tbody tr.row-suami:hover {
+  --row-bg: var(--owner-suami-hover);
+}
+
+.expenses-table tbody tr.row-istri:hover {
+  --row-bg: var(--owner-istri-hover);
+}
+
+.expenses-table tbody td {
+  background: var(--row-bg);
+}
+
 /* frozen first column */
 .expenses-table th:first-child,
 .expenses-table td:first-child {
   position: sticky;
   left: 0;
   z-index: 1;
-  background: var(--surface);
+  background: var(--row-bg, var(--surface));
   font-weight: 700;
 }
 
@@ -1670,10 +1728,6 @@ th.amount {
 tbody tr {
   cursor: pointer;
   transition: background 0.12s ease;
-}
-
-tbody tr:hover td {
-  background: var(--primary-soft);
 }
 
 tbody tr:last-child td {

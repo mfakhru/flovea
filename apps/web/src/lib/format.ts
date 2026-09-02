@@ -34,13 +34,25 @@ export function formatRupiahCompact(amount: number) {
   return formatRupiah(amount)
 }
 
-export function formatDate(iso: string) {
+/**
+ * Compact `01/09/26` for the Riwayat table. On a phone only about three of
+ * its columns fit at once, so the date — which is frozen and therefore always
+ * one of them — has to earn its width; the long `01 Sep 2026` form ate most
+ * of it. Headings and dropdowns still use the spelled-out forms below.
+ */
+export function formatDateShort(iso: string) {
   const [year, month, day] = iso.split('-')
-  return `${day} ${MONTHS[Number(month) - 1]?.slice(0, 3)} ${year}`
+  return `${day}/${month}/${year?.slice(2)}`
 }
 
 export function formatPeriod(period: string) {
   const [year, month] = period.split('-')
   const name = MONTHS[Number(month) - 1]
   return name ? `${name} ${year}` : period
+}
+
+/** `09/26` — the table-cell form of {@link formatPeriod}. */
+export function formatPeriodShort(period: string) {
+  const [year, month] = period.split('-')
+  return `${month}/${year?.slice(2)}`
 }

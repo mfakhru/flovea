@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { requireUser } from '../../lib/auth'
 import {
   getExpensesSummary,
-  getLatestMonth,
   listCategories,
   listExpenses,
   listPayPeriods,
@@ -12,7 +11,7 @@ import {
 } from '../../lib/expenses'
 import type { SummaryFilters } from '../../lib/expenses'
 import type { Category, UserSummary } from '../../lib/expenses'
-import { formatDate, formatPeriod, formatRupiah } from '../../lib/format'
+import { formatDateShort, formatPeriod, formatPeriodShort, formatRupiah } from '../../lib/format'
 
 type ExpensesSearch = {
   user_id?: number
@@ -39,39 +38,40 @@ export const Route = createFileRoute('/expenses/')({
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    // The month scope is a default view, not a filter the user picks: it
-    // keeps a plain visit from scanning the whole table. Any filter the
-    // user actually applies searches all of history instead — a filter
-    // that silently only looked at one month would hide most matches.
-    const filtered = Boolean(deps.pay_period || deps.q || deps.user_id || deps.category_id)
-    const monthScoped = !deps.all && !filtered
+    // The pay-period scope is a default view, not a filter the user picks: it
+    // keeps a plain visit from scanning the whole table, and matches the
+    // Dashboard, which also thinks in salary cycles rather than calendar
+    // months. Any filter the user actually applies searches all of history
+    // instead — a filter that silently only looked at one period would hide
+    // most matches. Picking a period in the dropdown is the exception: that
+    // *is* a scope, so it replaces the default instead of widening it.
+    const filtered = Boolean(deps.q || deps.user_id || deps.category_id)
+    const periodScoped = !deps.all && !filtered
 
-    // Scope to the newest month that holds data rather than the running
-    // calendar month, which is regularly still empty and would leave the
-    // page looking broken.
-    const latest = monthScoped ? await getLatestMonth() : { month: null }
-    const [latestYear, latestMonth] = latest.month ? latest.month.split('-').map(Number) : []
-    const year = monthScoped ? latestYear : undefined
-    const month = monthScoped ? latestMonth : undefined
+    // Scope to the newest pay period on record rather than the one the
+    // calendar happens to be in, which is regularly still empty and would
+    // leave the page looking broken. Rows carry the period they're charged
+    // to, so an expense dated 29 Agustus but charged to September lands here
+    // as soon as the September period exists.
+    const payPeriods = await listPayPeriods()
+    const defaultPeriod = periodScoped ? payPeriods[0] : undefined
+    const payPeriod = deps.pay_period ?? defaultPeriod
 
     // Also handed to the "Reimburse Semua" button as-is, so the bulk action
     // always settles exactly the set the summary (and its pending total) was
     // computed from — never a stale or differently-scoped set of rows.
     const summaryFilters: SummaryFilters = {
-      year,
-      month,
       category_id: deps.category_id,
       q: deps.q,
-      pay_period: deps.pay_period,
+      pay_period: payPeriod,
     }
-    const [expensesPage, categories, users, summary, payPeriods] = await Promise.all([
-      listExpenses({ data: { ...deps, year, month } }),
+    const [expensesPage, categories, users, summary] = await Promise.all([
+      listExpenses({ data: { ...deps, pay_period: payPeriod } }),
       listCategories(),
       listUsers(),
       getExpensesSummary({ data: summaryFilters }),
-      listPayPeriods(),
     ])
-    const periodLabel = monthScoped && latest.month ? formatPeriod(latest.month) : null
+    const periodLabel = defaultPeriod ? formatPeriod(defaultPeriod) : null
     return { expensesPage, categories, users, summary, payPeriods, periodLabel, filtered, summaryFilters }
   },
   component: ExpensesPage,
@@ -144,6 +144,17 @@ function ExpensesPage() {
   const suamiTotal = summary.by_user.find((u) => u.display_name === 'Suami')?.total ?? 0
   const istriTotal = summary.by_user.find((u) => u.display_name === 'Istri')?.total ?? 0
 
+  // Whose expense it is rides on the row's tint rather than its own column:
+  // on a phone only about three columns of this table fit at once, and a
+  // background colour costs none of them. The legend above the table says
+  // which colour is whose, and the row's title repeats it for a pointer.
+  const ownerRowClass = (userId: number) => {
+    const name = userById.get(userId)
+    if (name === 'Suami') return 'row-suami'
+    if (name === 'Istri') return 'row-istri'
+    return undefined
+  }
+
   return (
     <main className="page container">
       <div className="page-head">
@@ -158,7 +169,7 @@ function ExpensesPage() {
 
       {periodLabel && (
         <p className="table-hint">
-          Menampilkan riwayat {periodLabel} (bulan terakhir yang ada datanya).{' '}
+          Menampilkan periode gajian {periodLabel} (periode terakhir yang ada datanya).{' '}
           <button type="button" className="secondary btn-sm" onClick={() => updateFilter({ all: true })}>
             Tampilkan semua riwayat
           </button>
@@ -173,7 +184,7 @@ function ExpensesPage() {
             className="secondary btn-sm"
             onClick={() => updateFilter({ all: undefined })}
           >
-            Kembali ke bulan terakhir
+            Kembali ke periode terakhir
           </button>
         </p>
       )}
@@ -306,6 +317,16 @@ function ExpensesPage() {
         </div>
       ) : (
         <>
+          <div className="owner-legend">
+            <span className="chart-legend-item">
+              <span className="legend-dot legend-dot-suami" />
+              Suami
+            </span>
+            <span className="chart-legend-item">
+              <span className="legend-dot legend-dot-istri" />
+              Istri
+            </span>
+          </div>
           <p className="table-hint">↔ Geser tabel buat lihat kolom lainnya</p>
           <div className="table-wrap">
             <div className="table-scroll">
@@ -321,19 +342,26 @@ function ExpensesPage() {
                     <th className="amount">Nominal</th>
                     <th>Keterangan</th>
                     <th>Reimburse</th>
-                    <th>Orang</th>
                   </tr>
                 </thead>
                 <tbody>
                   {expensesPage.items.map((e) => (
                     <tr
                       key={e.id}
+                      className={ownerRowClass(e.user_id)}
+                      title={userById.get(e.user_id) ?? undefined}
                       onClick={() =>
                         navigate({ to: '/expenses/$id/edit', params: { id: String(e.id) } })
                       }
                     >
-                      <td>{formatDate(e.expense_date)}</td>
-                      <td>{e.pay_period ? formatPeriod(e.pay_period) : <span className="muted">—</span>}</td>
+                      <td>{formatDateShort(e.expense_date)}</td>
+                      <td>
+                        {e.pay_period ? (
+                          formatPeriodShort(e.pay_period)
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
                       <td>{categoryById.get(e.category_id) ?? '-'}</td>
                       <td>{e.detail}</td>
                       <td className="amount">{formatRupiah(e.amount)}</td>
@@ -351,7 +379,6 @@ function ExpensesPage() {
                           <span className="muted">—</span>
                         )}
                       </td>
-                      <td>{userById.get(e.user_id) ?? '-'}</td>
                     </tr>
                   ))}
                 </tbody>

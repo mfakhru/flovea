@@ -81,10 +81,6 @@ class ExpensePage(BaseModel):
     total_pages: int
 
 
-class LatestMonth(BaseModel):
-    month: str | None = None  # YYYY-MM of the newest expense_date, None if empty
-
-
 class CategoryTotal(BaseModel):
     category_id: int
     category_name: str
