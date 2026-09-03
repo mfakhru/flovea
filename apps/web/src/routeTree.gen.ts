@@ -12,9 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as ExpensesIndexRouteImport } from './routes/expenses/index'
+import { Route as ExpensesRiwayatRouteImport } from './routes/expenses/_riwayat'
 import { Route as ExpensesNewRouteImport } from './routes/expenses/new'
 import { Route as ExpensesIdEditRouteImport } from './routes/expenses/$id.edit'
+import { Route as ExpensesRiwayatIndexRouteImport } from './routes/expenses/_riwayat.index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -31,9 +32,9 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ExpensesIndexRoute = ExpensesIndexRouteImport.update({
-  id: '/expenses/',
-  path: '/expenses/',
+const ExpensesRiwayatRoute = ExpensesRiwayatRouteImport.update({
+  id: '/expenses/_riwayat',
+  path: '/expenses',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExpensesNewRoute = ExpensesNewRouteImport.update({
@@ -46,31 +47,38 @@ const ExpensesIdEditRoute = ExpensesIdEditRouteImport.update({
   path: '/expenses/$id/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExpensesRiwayatIndexRoute = ExpensesRiwayatIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ExpensesRiwayatRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
+  '/expenses': typeof ExpensesRiwayatRouteWithChildren
   '/expenses/new': typeof ExpensesNewRoute
-  '/expenses/': typeof ExpensesIndexRoute
   '/expenses/$id/edit': typeof ExpensesIdEditRoute
+  '/expenses/': typeof ExpensesRiwayatIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
   '/expenses/new': typeof ExpensesNewRoute
-  '/expenses': typeof ExpensesIndexRoute
   '/expenses/$id/edit': typeof ExpensesIdEditRoute
+  '/expenses': typeof ExpensesRiwayatIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
+  '/expenses/_riwayat': typeof ExpensesRiwayatRouteWithChildren
   '/expenses/new': typeof ExpensesNewRoute
-  '/expenses/': typeof ExpensesIndexRoute
   '/expenses/$id/edit': typeof ExpensesIdEditRoute
+  '/expenses/_riwayat/': typeof ExpensesRiwayatIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -78,33 +86,35 @@ export interface FileRouteTypes {
     | '/'
     | '/import'
     | '/login'
+    | '/expenses'
     | '/expenses/new'
-    | '/expenses/'
     | '/expenses/$id/edit'
+    | '/expenses/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/import'
     | '/login'
     | '/expenses/new'
-    | '/expenses'
     | '/expenses/$id/edit'
+    | '/expenses'
   id:
     | '__root__'
     | '/'
     | '/import'
     | '/login'
+    | '/expenses/_riwayat'
     | '/expenses/new'
-    | '/expenses/'
     | '/expenses/$id/edit'
+    | '/expenses/_riwayat/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ImportRoute: typeof ImportRoute
   LoginRoute: typeof LoginRoute
+  ExpensesRiwayatRoute: typeof ExpensesRiwayatRouteWithChildren
   ExpensesNewRoute: typeof ExpensesNewRoute
-  ExpensesIndexRoute: typeof ExpensesIndexRoute
   ExpensesIdEditRoute: typeof ExpensesIdEditRoute
 }
 
@@ -131,11 +141,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/expenses/': {
-      id: '/expenses/'
+    '/expenses/_riwayat': {
+      id: '/expenses/_riwayat'
       path: '/expenses'
-      fullPath: '/expenses/'
-      preLoaderRoute: typeof ExpensesIndexRouteImport
+      fullPath: '/expenses'
+      preLoaderRoute: typeof ExpensesRiwayatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/expenses/new': {
@@ -152,15 +162,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExpensesIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/expenses/_riwayat/': {
+      id: '/expenses/_riwayat/'
+      path: '/'
+      fullPath: '/expenses/'
+      preLoaderRoute: typeof ExpensesRiwayatIndexRouteImport
+      parentRoute: typeof ExpensesRiwayatRoute
+    }
   }
 }
+
+interface ExpensesRiwayatRouteChildren {
+  ExpensesRiwayatIndexRoute: typeof ExpensesRiwayatIndexRoute
+}
+
+const ExpensesRiwayatRouteChildren: ExpensesRiwayatRouteChildren = {
+  ExpensesRiwayatIndexRoute: ExpensesRiwayatIndexRoute,
+}
+
+const ExpensesRiwayatRouteWithChildren = ExpensesRiwayatRoute._addFileChildren(
+  ExpensesRiwayatRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ImportRoute: ImportRoute,
   LoginRoute: LoginRoute,
+  ExpensesRiwayatRoute: ExpensesRiwayatRouteWithChildren,
   ExpensesNewRoute: ExpensesNewRoute,
-  ExpensesIndexRoute: ExpensesIndexRoute,
   ExpensesIdEditRoute: ExpensesIdEditRoute,
 }
 export const routeTree = rootRouteImport

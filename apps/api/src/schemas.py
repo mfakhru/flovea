@@ -81,6 +81,31 @@ class ExpensePage(BaseModel):
     total_pages: int
 
 
+class HistoryShell(BaseModel):
+    """The parts of the Riwayat page that don't change when you turn a page.
+
+    Split from the rows on purpose: paging re-runs its route's loader, and
+    re-fetching the filter dropdowns and the summary — identical on every page
+    of the same filter — was most of what made paging feel heavy.
+    """
+
+    # The period the rows are scoped to, and whether the server picked it (no
+    # filter given) rather than the caller. The page needs the difference: only
+    # a server-picked period gets the "showing the latest period" notice.
+    pay_period: str | None = None
+    scoped_by_default: bool = False
+    summary: ExpenseSummary
+    categories: list[CategoryOut]
+    users: list[UserSummary]
+    pay_periods: list[str]
+
+
+class HistoryRows(ExpensePage):
+    """One page of rows, scoped the same way the shell above was."""
+
+    pay_period: str | None = None
+
+
 class CategoryTotal(BaseModel):
     category_id: int
     category_name: str

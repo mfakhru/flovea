@@ -1,6 +1,6 @@
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from db import execute, fetch_all, fetch_one
 from schemas import (
@@ -10,6 +10,8 @@ from schemas import (
     ExpenseOut,
     ExpensePage,
     ExpenseSummary,
+    HistoryRows,
+    HistoryShell,
     PeriodTotal,
 )
 from security import get_current_user
@@ -85,25 +87,7 @@ def _build_filters(
     return clauses, params
 
 
-@router.get("/expenses", response_model=ExpensePage)
-async def list_expenses(
-    request: Request,
-    year: int | None = None,
-    month: int | None = None,
-    user_id: int | None = None,
-    category_id: int | None = None,
-    q: str | None = None,
-    pay_period: str | None = None,
-    sort: str = "desc",
-    page: int = 1,
-    user: dict = Depends(get_current_user),
-):
-    env = request.scope["env"]
-    clauses, params = _build_filters(year, month, category_id, q, pay_period)
-    if user_id is not None:
-        clauses.append("user_id = ?")
-        params.append(user_id)
-
+async def _fetch_page(env, clauses: list[str], params: list, sort: str, page: int) -> dict:
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     order = "ASC" if sort == "asc" else "DESC"
     offset = max(page - 1, 0) * PAGE_SIZE
@@ -126,21 +110,13 @@ async def list_expenses(
     return {"items": items, "page": page, "page_size": PAGE_SIZE, "total": total, "total_pages": total_pages}
 
 
-@router.get("/expenses/summary", response_model=ExpenseSummary)
-async def get_expenses_summary(
-    request: Request,
-    year: int | None = None,
-    month: int | None = None,
-    category_id: int | None = None,
-    q: str | None = None,
-    pay_period: str | None = None,
-    user: dict = Depends(get_current_user),
-):
-    env = request.scope["env"]
-    clauses, params = _build_filters(year, month, category_id, q, pay_period)
-    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+async def _fetch_summary(env, clauses: list[str], params: list, users: list[dict]) -> dict:
+    """Per-user and special-case totals for the rows matching `clauses`.
 
-    users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY id")
+    Takes the user list rather than querying it, so a caller that already
+    needs the users for its own response doesn't pay for them twice.
+    """
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
     # "A_"-prefixed expenses are a special case tracked in their own bucket,
     # excluded from both users' totals regardless of owner/reimbursement. A
@@ -176,16 +152,142 @@ async def get_expenses_summary(
         SPECIAL_CASE_PREFIX,
     )
 
-    by_user = [
-        {"user_id": u["id"], "display_name": u["display_name"], "total": totals_by_user.get(u["id"], 0)}
-        for u in users
-    ]
     return {
-        "by_user": by_user,
+        "by_user": [
+            {"user_id": u["id"], "display_name": u["display_name"], "total": totals_by_user.get(u["id"], 0)}
+            for u in users
+        ],
         "pending_reimburse": pending_row["total"] if pending_row else 0,
         "pending_count": pending_row["cnt"] if pending_row else 0,
         "special_case_total": special_case_total,
     }
+
+
+@router.get("/expenses", response_model=ExpensePage)
+async def list_expenses(
+    request: Request,
+    year: int | None = None,
+    month: int | None = None,
+    user_id: int | None = None,
+    category_id: int | None = None,
+    q: str | None = None,
+    pay_period: str | None = None,
+    sort: str = "desc",
+    page: int = 1,
+    user: dict = Depends(get_current_user),
+):
+    env = request.scope["env"]
+    clauses, params = _build_filters(year, month, category_id, q, pay_period)
+    if user_id is not None:
+        clauses.append("user_id = ?")
+        params.append(user_id)
+    return await _fetch_page(env, clauses, params, sort, page)
+
+
+@router.get("/expenses/summary", response_model=ExpenseSummary)
+async def get_expenses_summary(
+    request: Request,
+    year: int | None = None,
+    month: int | None = None,
+    category_id: int | None = None,
+    q: str | None = None,
+    pay_period: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    env = request.scope["env"]
+    clauses, params = _build_filters(year, month, category_id, q, pay_period)
+    users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY id")
+    return await _fetch_summary(env, clauses, params, users)
+
+
+async def _resolve_period(
+    env,
+    q: str | None,
+    user_id: int | None,
+    category_id: int | None,
+    pay_period: str | None,
+    show_all: bool,
+) -> tuple[list[str], str | None]:
+    """Which pay period a Riwayat request is scoped to, and every period on
+    record.
+
+    Scoping to a period is a default view rather than a filter the caller
+    picks, so it is resolved here — making the client fetch the period list
+    first, only to hand it straight back, put a round-trip in front of every
+    other request the page made. A caller-supplied period replaces the default:
+    it *is* a scope. The other filters instead search all of history, since one
+    that silently looked at a single period would hide most of its own matches.
+    """
+    rows = await fetch_all(
+        env.DB,
+        "SELECT DISTINCT pay_period FROM expenses WHERE pay_period IS NOT NULL ORDER BY pay_period DESC",
+    )
+    pay_periods = [row["pay_period"] for row in rows]
+    filtered = bool(q or user_id or category_id)
+    default_period = pay_periods[0] if pay_periods and not show_all and not filtered else None
+    return pay_periods, (pay_period or default_period)
+
+
+@router.get("/expenses/history/shell", response_model=HistoryShell)
+async def get_history_shell(
+    request: Request,
+    user_id: int | None = None,
+    category_id: int | None = None,
+    q: str | None = None,
+    pay_period: str | None = None,
+    show_all: bool = Query(False, alias="all"),
+    user: dict = Depends(get_current_user),
+):
+    """Everything around the table: totals, both filter dropdowns, the user
+    list. Deliberately excludes the rows, so turning a page doesn't re-fetch
+    any of it."""
+    env = request.scope["env"]
+    pay_periods, period = await _resolve_period(env, q, user_id, category_id, pay_period, show_all)
+
+    clauses, params = _build_filters(None, None, category_id, q, period)
+    users = await fetch_all(env.DB, "SELECT id, display_name FROM users ORDER BY display_name")
+    summary = await _fetch_summary(env, clauses, params, users)
+    categories = await fetch_all(
+        env.DB,
+        "SELECT c.*, COUNT(e.id) AS usage_count FROM categories c "
+        "LEFT JOIN expenses e ON e.category_id = c.id "
+        "GROUP BY c.id ORDER BY c.name",
+    )
+
+    return {
+        "pay_period": period,
+        "scoped_by_default": period is not None and pay_period is None,
+        "summary": summary,
+        "categories": categories,
+        "users": users,
+        "pay_periods": pay_periods,
+    }
+
+
+@router.get("/expenses/history/rows", response_model=HistoryRows)
+async def get_history_rows(
+    request: Request,
+    user_id: int | None = None,
+    category_id: int | None = None,
+    q: str | None = None,
+    pay_period: str | None = None,
+    show_all: bool = Query(False, alias="all"),
+    sort: str = "desc",
+    page: int = 1,
+    user: dict = Depends(get_current_user),
+):
+    """One page of the table. Resolves the scope the same way the shell does
+    rather than having the caller pass it back, so paging stays a single
+    request that depends on nothing else."""
+    env = request.scope["env"]
+    _, period = await _resolve_period(env, q, user_id, category_id, pay_period, show_all)
+
+    clauses, params = _build_filters(None, None, category_id, q, period)
+    if user_id is not None:
+        clauses.append("user_id = ?")
+        params.append(user_id)
+    result = await _fetch_page(env, clauses, params, sort, page)
+    return {**result, "pay_period": period}
 
 
 @router.get("/expenses/by-category", response_model=list[CategoryTotal])

@@ -37,17 +37,6 @@ export type Expense = {
   created_at: string
 }
 
-export type ExpenseFilters = {
-  year?: number
-  month?: number
-  user_id?: number
-  category_id?: number
-  q?: string
-  pay_period?: string
-  sort?: 'asc' | 'desc'
-  page?: number
-}
-
 export type ExpenseInput = {
   category_id: number
   expense_date: string
@@ -86,6 +75,39 @@ export type SummaryFilters = {
   pay_period?: string
 }
 
+/**
+ * Mirrors HistoryShell / HistoryRows in apps/api/src/schemas.py.
+ *
+ * The Riwayat page is fetched in two pieces because they change at different
+ * rates: the shell is the same on every page of a given filter, so paging asks
+ * only for rows. See the loaders in routes/expenses/_riwayat*.tsx.
+ */
+export type HistoryShell = {
+  /** The period the rows are scoped to, server-picked when no filter asked. */
+  pay_period: string | null
+  scoped_by_default: boolean
+  summary: ExpenseSummary
+  categories: Category[]
+  users: UserSummary[]
+  pay_periods: string[]
+}
+
+export type HistoryRows = ExpensePage & { pay_period: string | null }
+
+/** Filters that scope the page. Excludes `page`/`sort`, which move rows only. */
+export type HistoryFilters = {
+  user_id?: number
+  category_id?: number
+  q?: string
+  pay_period?: string
+  all?: boolean
+}
+
+export type HistoryRowFilters = HistoryFilters & {
+  sort?: 'asc' | 'desc'
+  page?: number
+}
+
 export type CategoryTotal = { category_id: number; category_name: string; total: number }
 export type PeriodTotal = { pay_period: string; by_user: UserTotal[]; total: number }
 
@@ -96,6 +118,32 @@ export const listCategories = createServerFn({ method: 'GET' }).handler(
 export const listPayPeriods = createServerFn({ method: 'GET' }).handler(
   async (): Promise<string[]> => apiJson<string[]>('/expenses/pay-periods'),
 )
+
+function historyParams(data: HistoryRowFilters) {
+  const params = new URLSearchParams()
+  if (data.user_id) params.set('user_id', String(data.user_id))
+  if (data.category_id) params.set('category_id', String(data.category_id))
+  if (data.q) params.set('q', data.q)
+  if (data.pay_period) params.set('pay_period', data.pay_period)
+  if (data.all) params.set('all', 'true')
+  return params
+}
+
+export const getHistoryShell = createServerFn({ method: 'GET' })
+  .validator((filters: HistoryFilters) => filters)
+  .handler(
+    async ({ data }): Promise<HistoryShell> =>
+      apiJson<HistoryShell>(`/expenses/history/shell?${historyParams(data).toString()}`),
+  )
+
+export const getHistoryRows = createServerFn({ method: 'GET' })
+  .validator((filters: HistoryRowFilters) => filters)
+  .handler(async ({ data }): Promise<HistoryRows> => {
+    const params = historyParams(data)
+    if (data.sort) params.set('sort', data.sort)
+    if (data.page) params.set('page', String(data.page))
+    return apiJson<HistoryRows>(`/expenses/history/rows?${params.toString()}`)
+  })
 
 export const listUsers = createServerFn({ method: 'GET' }).handler(
   async (): Promise<UserSummary[]> => apiJson<UserSummary[]>('/users'),
@@ -111,21 +159,6 @@ export const createCategory = createServerFn({ method: 'POST' })
         body: JSON.stringify(data),
       }),
   )
-
-export const listExpenses = createServerFn({ method: 'GET' })
-  .validator((filters: ExpenseFilters) => filters)
-  .handler(async ({ data }): Promise<ExpensePage> => {
-    const params = new URLSearchParams()
-    if (data.year) params.set('year', String(data.year))
-    if (data.month) params.set('month', String(data.month))
-    if (data.user_id) params.set('user_id', String(data.user_id))
-    if (data.category_id) params.set('category_id', String(data.category_id))
-    if (data.q) params.set('q', data.q)
-    if (data.pay_period) params.set('pay_period', data.pay_period)
-    if (data.sort) params.set('sort', data.sort)
-    if (data.page) params.set('page', String(data.page))
-    return apiJson<ExpensePage>(`/expenses?${params.toString()}`)
-  })
 
 export const getExpensesSummary = createServerFn({ method: 'GET' })
   .validator((filters: SummaryFilters) => filters)

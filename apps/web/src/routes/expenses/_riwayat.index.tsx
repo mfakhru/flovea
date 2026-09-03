@@ -1,16 +1,15 @@
-import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
-import { requireUser } from '../../lib/auth'
 import {
-  getExpensesSummary,
-  listCategories,
-  listExpenses,
-  listPayPeriods,
-  listUsers,
-  reimburseAll,
-} from '../../lib/expenses'
-import type { SummaryFilters } from '../../lib/expenses'
-import type { Category, UserSummary } from '../../lib/expenses'
+  createFileRoute,
+  Link,
+  useLoaderData,
+  useNavigate,
+  useRouter,
+  useRouterState,
+} from '@tanstack/react-router'
+import { useEffect, useRef, useState } from 'react'
+import { getHistoryRows, reimburseAll } from '../../lib/expenses'
+import type { ExpensesSearch } from './_riwayat'
+import type { Category, SummaryFilters, UserSummary } from '../../lib/expenses'
 import { formatDateShort, formatPeriod, formatPeriodShort, formatRupiah } from '../../lib/format'
 
 // Pinch-to-zoom bounds for the table. At 100% a phone shows about three of
@@ -23,75 +22,80 @@ const ZOOM_STEP = 0.1
 const clampZoom = (value: number) =>
   Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 100) / 100))
 
-type ExpensesSearch = {
-  user_id?: number
-  category_id?: number
-  q?: string
-  pay_period?: string
-  sort?: 'asc' | 'desc'
-  page?: number
-  all?: boolean
-}
-
-export const Route = createFileRoute('/expenses/')({
-  validateSearch: (search: Record<string, unknown>): ExpensesSearch => ({
-    user_id: search.user_id ? Number(search.user_id) : undefined,
-    category_id: search.category_id ? Number(search.category_id) : undefined,
-    q: search.q ? String(search.q) : undefined,
-    pay_period: search.pay_period ? String(search.pay_period) : undefined,
-    sort: search.sort === 'asc' ? 'asc' : 'desc',
-    page: search.page ? Number(search.page) : 1,
-    all: search.all === true || search.all === 'true' ? true : undefined,
-  }),
-  beforeLoad: async () => {
-    await requireUser()
-  },
+export const Route = createFileRoute('/expenses/_riwayat/')({
+  // Everything the table's own query depends on. The filters are here as well
+  // as on the layout above because rows have to be filtered too — but only
+  // this loader re-runs when `page` or `sort` changes.
   loaderDeps: ({ search }) => search,
-  loader: async ({ deps }) => {
-    // The pay-period scope is a default view, not a filter the user picks: it
-    // keeps a plain visit from scanning the whole table, and matches the
-    // Dashboard, which also thinks in salary cycles rather than calendar
-    // months. Any filter the user actually applies searches all of history
-    // instead — a filter that silently only looked at one period would hide
-    // most matches. Picking a period in the dropdown is the exception: that
-    // *is* a scope, so it replaces the default instead of widening it.
-    const filtered = Boolean(deps.q || deps.user_id || deps.category_id)
-    const periodScoped = !deps.all && !filtered
-
-    // Scope to the newest pay period on record rather than the one the
-    // calendar happens to be in, which is regularly still empty and would
-    // leave the page looking broken. Rows carry the period they're charged
-    // to, so an expense dated 29 Agustus but charged to September lands here
-    // as soon as the September period exists.
-    const payPeriods = await listPayPeriods()
-    const defaultPeriod = periodScoped ? payPeriods[0] : undefined
-    const payPeriod = deps.pay_period ?? defaultPeriod
-
-    // Also handed to the "Reimburse Semua" button as-is, so the bulk action
-    // always settles exactly the set the summary (and its pending total) was
-    // computed from — never a stale or differently-scoped set of rows.
-    const summaryFilters: SummaryFilters = {
-      category_id: deps.category_id,
-      q: deps.q,
-      pay_period: payPeriod,
-    }
-    const [expensesPage, categories, users, summary] = await Promise.all([
-      listExpenses({ data: { ...deps, pay_period: payPeriod } }),
-      listCategories(),
-      listUsers(),
-      getExpensesSummary({ data: summaryFilters }),
-    ])
-    const periodLabel = defaultPeriod ? formatPeriod(defaultPeriod) : null
-    return { expensesPage, categories, users, summary, payPeriods, periodLabel, filtered, summaryFilters }
-  },
+  loader: async ({ deps }) => getHistoryRows({ data: deps }),
   component: ExpensesPage,
 })
 
+/**
+ * A page step as a link rather than a button, so `preload="intent"` can start
+ * the fetch on hover — or on touchstart, which fires before the tap completes,
+ * meaning the rows are usually already on their way by the time the press
+ * registers. Preloading is off by default for the app (see router.tsx, which
+ * weighs it against the free tier); two links the reader is visibly reaching
+ * for are worth the exception. At the ends of the range it falls back to a
+ * disabled button — an anchor has no honest disabled state.
+ */
+function PageLink({
+  page,
+  disabled,
+  children,
+}: {
+  page: number
+  disabled: boolean
+  children: React.ReactNode
+}) {
+  if (disabled) {
+    return (
+      <button type="button" className="secondary" disabled>
+        {children}
+      </button>
+    )
+  }
+  return (
+    <Link
+      to="/expenses"
+      search={(prev: ExpensesSearch) => ({ ...prev, page })}
+      preload="intent"
+      className="btn secondary"
+    >
+      {children}
+    </Link>
+  )
+}
+
 function ExpensesPage() {
   const search = Route.useSearch()
-  const { expensesPage, categories, users, summary, payPeriods, periodLabel, filtered, summaryFilters } =
-    Route.useLoaderData()
+  const expensesPage = Route.useLoaderData()
+  const {
+    summary,
+    categories,
+    users,
+    pay_periods: payPeriods,
+    pay_period: activePeriod,
+    scoped_by_default: scopedByDefault,
+  } = useLoaderData({ from: '/expenses/_riwayat' })
   const navigate = useNavigate({ from: Route.fullPath })
+  // Turning a page swaps the rows out from under the reader; without this the
+  // table just sits there looking unchanged until the new page lands.
+  const loading = useRouterState({ select: (s) => s.isLoading })
+
+  const filtered = Boolean(search.q || search.user_id || search.category_id)
+  // Only a server-picked period gets the "showing the latest period" notice;
+  // one the user chose in the dropdown is already visible in the filters.
+  const periodLabel = scopedByDefault && activePeriod ? formatPeriod(activePeriod) : null
+  // Handed to the "Reimburse Semua" button as-is, so the bulk action always
+  // settles exactly the set the summary (and its pending total) was computed
+  // from — never a stale or differently-scoped set of rows.
+  const summaryFilters: SummaryFilters = {
+    category_id: search.category_id,
+    q: search.q,
+    pay_period: activePeriod ?? undefined,
+  }
   const router = useRouter()
   const [searchInput, setSearchInput] = useState(search.q ?? '')
   const [reimbursing, setReimbursing] = useState(false)
@@ -413,7 +417,7 @@ function ExpensesPage() {
             </div>
           </div>
           <p className="table-hint">↔ Geser atau cubit tabel buat lihat kolom lainnya</p>
-          <div className="table-wrap">
+          <div className={loading ? 'table-wrap is-loading' : 'table-wrap'}>
             <div className="table-scroll" ref={scrollRef}>
               <table className="expenses-table" style={{ zoom: String(zoom) }}>
                 <thead>
@@ -473,29 +477,18 @@ function ExpensesPage() {
           </div>
 
           <div className="pagination">
-            <button
-              type="button"
-              className="secondary"
-              disabled={(search.page ?? 1) <= 1}
-              onClick={() =>
-                navigate({ search: (prev) => ({ ...prev, page: (prev.page ?? 1) - 1 }) })
-              }
-            >
+            <PageLink page={(search.page ?? 1) - 1} disabled={(search.page ?? 1) <= 1}>
               ← Sebelumnya
-            </button>
+            </PageLink>
             <span className="muted">
               Halaman {search.page ?? 1} dari {expensesPage.total_pages} ({expensesPage.total} data)
             </span>
-            <button
-              type="button"
-              className="secondary"
+            <PageLink
+              page={(search.page ?? 1) + 1}
               disabled={(search.page ?? 1) >= expensesPage.total_pages}
-              onClick={() =>
-                navigate({ search: (prev) => ({ ...prev, page: (prev.page ?? 1) + 1 }) })
-              }
             >
               Berikutnya →
-            </button>
+            </PageLink>
           </div>
         </>
       )}

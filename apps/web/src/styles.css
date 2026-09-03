@@ -1845,6 +1845,16 @@ tbody tr:last-child td {
   margin-top: 1.25rem;
 }
 
+/* Rows on their way in. The old page stays readable and in place — blanking
+   the table would cost the reader their bearings for the sake of showing a
+   spinner — but it stops accepting clicks meant for rows it is about to
+   replace. */
+.table-wrap.is-loading {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
 /* =========================================================
    Auth
    ========================================================= */
@@ -2121,7 +2131,8 @@ tbody tr:last-child td {
     gap: 0.5rem;
   }
 
-  .pagination button {
+  .pagination button,
+  .pagination .btn {
     flex: 1;
     padding-inline: 0.75rem;
   }
