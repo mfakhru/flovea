@@ -34,6 +34,10 @@
   --expense-border: #fecdd3;
   --balance: #6366f1;
   --balance-soft: #eef2ff;
+  /* "Diterima Istri" — money in, but deliberately not the same green as
+     household "Pemasukan": the two sit one card apart and are different
+     figures, so they must not read as the same quantity. */
+  --allowance-soft: #f5f3ff;
 
   /* Owner tints for the Riwayat rows — they stand in for the "Orang" column.
      Pre-mixed against --surface rather than written as rgba(): the frozen
@@ -487,6 +491,13 @@ main.page {
 }
 .stat-balance .stat-value {
   color: var(--primary-strong);
+}
+
+.stat-allowance .stat-icon {
+  background: var(--allowance-soft);
+}
+.stat-allowance .stat-value {
+  color: #6d28d9;
 }
 
 .stat-warn {
@@ -1945,6 +1956,111 @@ tbody tr:last-child td {
 }
 
 /* =========================================================
+   Saldo ledger
+   ========================================================= */
+
+/* Signed figures. A leading "+"/"−" alone is easy to miss in a column of
+   numbers, so the direction is carried by colour as well as by the sign. */
+.amount-plus {
+  color: #047857;
+}
+
+.amount-minus {
+  color: #be123c;
+}
+
+/* The row whose period the page is currently scoped to. */
+.ledger-table tbody tr.is-active {
+  --row-bg: var(--primary-soft);
+}
+
+/* Reads as the foot of the running Saldo column rather than as another
+   period — it sits last because the rows run newest first. */
+.ledger-opening {
+  cursor: default;
+}
+
+.ledger-opening td {
+  --row-bg: var(--surface-sunken);
+  color: var(--text-soft);
+}
+
+.link-button {
+  margin-left: 0.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--primary-hover);
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.link-button.danger {
+  color: var(--danger);
+}
+
+.adjust-form {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: end;
+  gap: 0.875rem;
+  margin-top: 1.25rem;
+}
+
+.adjust-form .error,
+.adjust-form > .btn {
+  grid-column: 1 / -1;
+}
+
+.adjust-form > .btn {
+  justify-self: start;
+}
+
+.adjust-direction {
+  margin-bottom: 0.5rem;
+}
+
+.adjust-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.adjust-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--surface-sunken);
+  border-radius: var(--r-md);
+  font-size: 0.875rem;
+}
+
+.adjust-period {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Takes the slack so the nominal and the delete action keep their place
+   however long the note is. */
+.adjust-note {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* =========================================================
    Mobile
    ========================================================= */
 
@@ -2024,6 +2140,14 @@ tbody tr:last-child td {
 
   .filters {
     grid-template-columns: 1fr;
+  }
+
+  .adjust-form {
+    grid-template-columns: 1fr;
+  }
+
+  .adjust-form > .btn {
+    justify-self: stretch;
   }
 
   .stat-row {

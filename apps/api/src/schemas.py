@@ -121,9 +121,57 @@ class PeriodTotal(BaseModel):
 class IncomeOut(BaseModel):
     pay_period: str  # YYYY-MM
     amount: int  # IDR, whole rupiah; 0 means nothing recorded for the period
+    # The slice of that income handed over to Istri — the "diterima" side of
+    # the Saldo ledger. Separate from `amount`, which stays the household
+    # figure behind the Home trend chart. 0 means nothing recorded yet.
+    istri_amount: int = 0
 
 
 class IncomeUpsert(BaseModel):
+    amount: int
+
+
+class AdjustmentCreate(BaseModel):
+    pay_period: str  # YYYY-MM
+    amount: int  # signed: negative takes money out of the balance
+    note: str
+
+
+class AdjustmentOut(AdjustmentCreate):
+    id: int
+    created_at: str
+
+
+class BalanceRow(BaseModel):
+    """One pay period of the Saldo ledger.
+
+    `closing_balance` is the running figure — the opening balance plus every
+    `net` up to and including this period — so a row can be read on its own
+    without the reader summing the column themselves.
+    """
+
+    pay_period: str
+    received: int
+    spent: int
+    adjustment: int
+    net: int
+    closing_balance: int
+
+
+class BalanceRecap(BaseModel):
+    opening_balance: int
+    current_balance: int
+    # Suami's expenses flagged for reimbursement that Istri hasn't marked
+    # lunas yet. Deliberately NOT subtracted from the balance — it only lands
+    # there once marked, matching how /expenses/summary attributes totals —
+    # but reported alongside so the money already committed stays visible.
+    pending_reimburse: int
+    pending_count: int
+    rows: list[BalanceRow]  # newest period first
+    adjustments: list[AdjustmentOut]
+
+
+class OpeningBalanceUpsert(BaseModel):
     amount: int
 
 

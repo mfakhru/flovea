@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { requireUser } from '../lib/auth'
 import {
   getExpensesByCategory,
@@ -8,6 +8,7 @@ import {
 } from '../lib/expenses'
 import type { CategoryTotal } from '../lib/expenses'
 import { getIncome, listIncomes } from '../lib/incomes'
+import { getBalance } from '../lib/balance'
 import { buildTrend, computeDelta, formatPercent, previousPeriod, share } from '../lib/analytics'
 import { formatPeriod, formatRupiah, formatRupiahCompact } from '../lib/format'
 import CountUp from '../components/CountUp'
@@ -39,7 +40,7 @@ export const Route = createFileRoute('/')({
     // comparison on this page.
     const prevPeriod = previousPeriod(payPeriods, activePeriod)
 
-    const [summary, byCategory, byPeriod, incomes, income, prevSummary, prevByCategory] =
+    const [summary, byCategory, byPeriod, incomes, income, balance, prevSummary, prevByCategory] =
       await Promise.all([
         getExpensesSummary({ data: { pay_period: activePeriod } }),
         getExpensesByCategory({ data: { pay_period: activePeriod } }),
@@ -48,6 +49,7 @@ export const Route = createFileRoute('/')({
         getExpensesByPeriod({ data: { limit: byYear ? 20 : 12, group: byYear ? 'year' : 'month' } }),
         listIncomes(),
         activePeriod ? getIncome({ data: { pay_period: activePeriod } }) : { amount: 0 },
+        getBalance(),
         prevPeriod
           ? getExpensesSummary({ data: { pay_period: prevPeriod } })
           : null,
@@ -65,6 +67,13 @@ export const Route = createFileRoute('/')({
       byPeriod,
       incomes,
       income: income.amount,
+      // The running Istri balance as it stood at the end of `activePeriod` —
+      // not the all-time figure, so the card stays consistent with the period
+      // picker driving the rest of the page.
+      istriBalance:
+        balance.rows.find((r) => r.pay_period === activePeriod)?.closing_balance ??
+        balance.rows.find((r) => r.pay_period < (activePeriod ?? ''))?.closing_balance ??
+        balance.opening_balance,
       prevSummary,
       prevByCategory,
       byYear,
@@ -90,6 +99,7 @@ function HomePage() {
     byPeriod,
     incomes,
     income,
+    istriBalance,
     prevSummary,
     prevByCategory,
     byYear,
@@ -173,6 +183,22 @@ function HomePage() {
             ) : (
               <span className="delta delta-empty">Isi pemasukan dulu</span>
             )
+          }
+        />
+        <StatCard
+          tone={istriBalance < 0 ? 'warn' : 'balance'}
+          icon={istriBalance < 0 ? '⚠️' : '👛'}
+          label="Saldo Istri"
+          value={istriBalance}
+          action={
+            <Link to="/saldo" className="stat-action" aria-label="Buka rekap saldo Istri">
+              →
+            </Link>
+          }
+          footer={
+            <span className="delta delta-neutral">
+              {activePeriod ? `Akumulasi s/d ${formatPeriod(activePeriod)}` : 'Belum ada periode'}
+            </span>
           }
         />
         {summary.pending_reimburse > 0 && (

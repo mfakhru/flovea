@@ -36,7 +36,7 @@ IS_SPECIAL_CASE_SQL = (
 NOT_SPECIAL_CASE_CLAUSE = f"NOT {IS_SPECIAL_CASE_SQL}"
 
 
-async def _get_istri_id(env) -> int:
+async def get_istri_id(env) -> int:
     """The one user who isn't Suami — reimbursement always settles to them,
     regardless of which of the two accounts happens to click the button."""
     row = await fetch_one(env.DB, "SELECT id FROM users WHERE display_name != ?", SUAMI_DISPLAY_NAME)
@@ -383,7 +383,7 @@ async def reimburse_all(
     clauses += [NOT_SPECIAL_CASE_CLAUSE, "needs_reimburse = 1", "reimbursed_at IS NULL"]
     where = f"WHERE {' AND '.join(clauses)}"
 
-    istri_id = await _get_istri_id(env)
+    istri_id = await get_istri_id(env)
     rows = await fetch_all(
         env.DB,
         f"UPDATE expenses SET reimbursed_at = datetime('now'), reimbursed_by = ? {where} "
@@ -474,7 +474,7 @@ async def toggle_reimburse(expense_id: int, request: Request, user: dict = Depen
     if existing["reimbursed_at"] is None:
         # Reimbursement always settles to Istri, regardless of which of the
         # two accounts happens to click the toggle — matches /reimburse-all.
-        istri_id = await _get_istri_id(env)
+        istri_id = await get_istri_id(env)
         await execute(
             env.DB,
             "UPDATE expenses SET reimbursed_at = datetime('now'), reimbursed_by = ? WHERE id = ?",

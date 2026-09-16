@@ -45,6 +45,9 @@ export default function Nav({ user }: { user: CurrentUser | null }) {
               <Link to="/expenses" onClick={() => setOpen(false)}>
                 Riwayat
               </Link>
+              <Link to="/saldo" onClick={() => setOpen(false)}>
+                Saldo
+              </Link>
               <Link to="/expenses/new" onClick={() => setOpen(false)}>
                 Tambah
               </Link>

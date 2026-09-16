@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SaldoRouteImport } from './routes/saldo'
 import { Route as ExpensesRiwayatRouteImport } from './routes/expenses/_riwayat'
 import { Route as ExpensesNewRouteImport } from './routes/expenses/new'
 import { Route as ExpensesIdEditRouteImport } from './routes/expenses/$id.edit'
@@ -30,6 +31,11 @@ const ImportRoute = ImportRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SaldoRoute = SaldoRouteImport.update({
+  id: '/saldo',
+  path: '/saldo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExpensesRiwayatRoute = ExpensesRiwayatRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
+  '/saldo': typeof SaldoRoute
   '/expenses': typeof ExpensesRiwayatRouteWithChildren
   '/expenses/new': typeof ExpensesNewRoute
   '/expenses/$id/edit': typeof ExpensesIdEditRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
+  '/saldo': typeof SaldoRoute
   '/expenses/new': typeof ExpensesNewRoute
   '/expenses/$id/edit': typeof ExpensesIdEditRoute
   '/expenses': typeof ExpensesRiwayatIndexRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
+  '/saldo': typeof SaldoRoute
   '/expenses/_riwayat': typeof ExpensesRiwayatRouteWithChildren
   '/expenses/new': typeof ExpensesNewRoute
   '/expenses/$id/edit': typeof ExpensesIdEditRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
     | '/'
     | '/import'
     | '/login'
+    | '/saldo'
     | '/expenses'
     | '/expenses/new'
     | '/expenses/$id/edit'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/import'
     | '/login'
+    | '/saldo'
     | '/expenses/new'
     | '/expenses/$id/edit'
     | '/expenses'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/import'
     | '/login'
+    | '/saldo'
     | '/expenses/_riwayat'
     | '/expenses/new'
     | '/expenses/$id/edit'
@@ -113,6 +125,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ImportRoute: typeof ImportRoute
   LoginRoute: typeof LoginRoute
+  SaldoRoute: typeof SaldoRoute
   ExpensesRiwayatRoute: typeof ExpensesRiwayatRouteWithChildren
   ExpensesNewRoute: typeof ExpensesNewRoute
   ExpensesIdEditRoute: typeof ExpensesIdEditRoute
@@ -139,6 +152,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/saldo': {
+      id: '/saldo'
+      path: '/saldo'
+      fullPath: '/saldo'
+      preLoaderRoute: typeof SaldoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/expenses/_riwayat': {
@@ -188,6 +208,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ImportRoute: ImportRoute,
   LoginRoute: LoginRoute,
+  SaldoRoute: SaldoRoute,
   ExpensesRiwayatRoute: ExpensesRiwayatRouteWithChildren,
   ExpensesNewRoute: ExpensesNewRoute,
   ExpensesIdEditRoute: ExpensesIdEditRoute,
